@@ -22,6 +22,9 @@ void spawn_proc (int in, int out, char *command); //used for execution in piping
 
 int main()
 {
+    FILE *fp;
+    fp = open("fat32.img",O_RDWR);
+
 	while(1)
 	{
 		printf("$ ");
