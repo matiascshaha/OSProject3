@@ -14,6 +14,12 @@ tokenlist *new_tokenlist(void);
 void add_token(tokenlist *tokens, char *item);
 void free_tokens(tokenlist *tokens);
 
+/*Helper functions*/
+int checkCommand(char *cmd); //check if a command is a built in or if we need to search $PATH
+char *command_path(tokenlist *dirs, char *cmd); //takes in directories from $PATH and returns valid command file
+int check_io(tokenlist * tokens);
+void spawn_proc (int in, int out, char *command); //used for execution in piping
+
 int main()
 {
 	while(1)
@@ -26,63 +32,74 @@ int main()
 		/*for (int i = 0; i < tokens->size; i++) {
 			printf("token %d: (%s)\n", i, tokens->items[i]);
 		}*/
+		
+		if(!checkCommand(tokens->items[0]) && !pipe_cmd)
+		{
+			//Take $PATH input and then parse on the ':'
+			char *path = getenv("PATH");
+			//store directories that we need to look through to run command
+			tokenlist *directories = get_tokens(path, ":");
+			//get path to command for execution
+			char *cmdpath = command_path(directories, tokens->items[0]);
 
-		if(strcmp(tokens->items[0], "exit") == 0)
-			break;
 
-		else if(strcmp(tokens->items[0], "info") == 0)
-		{}
+			
+			if(strcmp(tokens->items[0], "exit") == 0){
+				break;
+			}
 
-		else if(strcmp(tokens->items[0], "size") == 0)
-		{}
+			else if(strcmp(tokens->items[0], "info") == 0)
+			{}
 
-		else if(strcmp(tokens->items[0], "ls") == 0)
-		{}
+			else if(strcmp(tokens->items[0], "size") == 0)
+			{}
 
-		else if(strcmp(tokens->items[0], "cd") == 0)
-		{}
+			else if(strcmp(tokens->items[0], "ls") == 0)
+			{}
 
-		else if(strcmp(tokens->items[0], "creat") == 0)
-		{}
+			else if(strcmp(tokens->items[0], "cd") == 0)
+			{}
 
-		else if(strcmp(tokens->items[0], "mkdir") == 0)
-		{}
+			else if(strcmp(tokens->items[0], "creat") == 0)
+			{}
 
-		else if(strcmp(tokens->items[0], "mv") == 0)
-		{}
+			else if(strcmp(tokens->items[0], "mkdir") == 0)
+			{}
 
-		else if(strcmp(tokens->items[0], "open") == 0)
-		{}
+			else if(strcmp(tokens->items[0], "mv") == 0)
+			{}
 
-		else if(strcmp(tokens->items[0], "close") == 0)
-		{}
+			else if(strcmp(tokens->items[0], "open") == 0)
+			{}
 
-		else if(strcmp(tokens->items[0], "lseek") == 0)
-		{}
+			else if(strcmp(tokens->items[0], "close") == 0)
+			{}
 
-		else if(strcmp(tokens->items[0], "read") == 0)
-		{}
+			else if(strcmp(tokens->items[0], "lseek") == 0)
+			{}
 
-		else if(strcmp(tokens->items[0], "write") == 0)
-		{}
+			else if(strcmp(tokens->items[0], "read") == 0)
+			{}
 
-		else if(strcmp(tokens->items[0], "rm") == 0)
-		{}
+			else if(strcmp(tokens->items[0], "write") == 0)
+			{}
 
-		else if(strcmp(tokens->items[0], "cp") == 0)
-		{}
+			else if(strcmp(tokens->items[0], "rm") == 0)
+			{}
 
-		/*extra credit if we get to it
-		else if(strcmp(tokens->items[0], "rmdir") == 0)
-		{}
+			else if(strcmp(tokens->items[0], "cp") == 0)
+			{}
 
-		else if(strcmp(tokens->items[0], "cp") == 0 && 
-				strcmp(tokens->items[1] == "-r") == 0)
-		{}
-		*/
-		else //not a recognized command
-			printf("%s: command not found\n", tokens->items[0]);
-
+			/*extra credit if we get to it
+			else if(strcmp(tokens->items[0], "rmdir") == 0)
+			{}
+			else if(strcmp(tokens->items[0], "cp") == 0 && 
+					strcmp(tokens->items[1] == "-r") == 0)
+			{}
+			*/
+			else //not a recognized command
+				printf("%s: command not found\n", tokens->items[0]);
+		}
 		free(input);
 		free_tokens(tokens);
 	}
