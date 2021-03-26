@@ -10,13 +10,14 @@ typedef struct {
 	int size;
 	char **items;
 } tokenlist;
-char * buff[512];
+unsigned char * buff[5];
 char *get_input(void);
 tokenlist *get_tokens(char *input);
 
 tokenlist *new_tokenlist(void);
 void add_token(tokenlist *tokens, char *item);
 void free_tokens(tokenlist *tokens);
+void info(int desc);
 
 struct BPB {
 	unsigned int BytesPerSec;
@@ -35,27 +36,32 @@ int check_io(tokenlist * tokens);
 
 int main()
 {
-	int fp;
-    if((fp = open("fat32.img",O_RDWR)) == -1){
+	int fd;
+    if((fd = open("fat32.img",O_RDWR)) == -1){
 		printf("Cannot open fat32.img\n");
 		return 0;
 	}
-	else if(!(read(fp, buff, 512) == 512)){
+	/*else if((lseek(fd, 11, SEEK_SET)) == -1){
+		printf("Cannot seek fat32.img\n");
+		return 0;
+	}*/
+	else if(!(read(fd, buff, 2) == 2)){
 		printf("Cannot read fat32.img\n");
 		return 0;
 	}
+	/*//lseek(desc, 11, SEEK_SET);
 	char a;
-	for(int j = 0; j < 512; j++){
+	for(int j = 0; j < 2; j++){
 		a = buff[j];
-	for (int i = 0; i < 8; i++) {
-      printf("%d", !!((a << i) & 0x80));
-	}
+		for (int i = 0; i < 8; i++) {
+		  printf("%d", !!((a << i) & 0x80));
+		}
+		printf(" ");
 	}
 	printf("\n");
 
 	return 0;
-	
-	while(1)
+	*/while(1)
 	{
 		printf("$ ");
 		char *input = get_input();
@@ -82,7 +88,9 @@ int main()
 			}
 
 			else if(strcmp(tokens->items[0], "info") == 0)
-			{}
+			{
+				info(fd);
+			}
 
 			else if(strcmp(tokens->items[0], "size") == 0)
 			{}
@@ -138,6 +146,102 @@ int main()
 	}
 	//free dynamic memory if necessary
 	return 0;
+}
+
+void info(int desc){
+	struct BPB bpb;
+	unsigned char a[2];
+	
+	if((lseek(desc, 11, SEEK_SET)) == -1){
+		printf("Cannot seek fat32.img\n");
+	}
+	else if(!(read(desc, buff, 2) == 2)){
+		printf("Cannot read fat32.img\n");
+	}
+	bpb.BytesPerSec = 0;
+	for(int i = 0; i < 2; i++){
+		bpb.BytesPerSec += (unsigned int) buff[i];
+	}
+	printf("Bytes Per Sector: %d\n", bpb.BytesPerSec);
+	
+	//secperclust
+	if((lseek(desc, 13, SEEK_SET)) == -1){
+		printf("Cannot seek fat32.img\n");
+	}
+	else if(!(read(desc, buff, 1) == 1)){
+		printf("Cannot read fat32.img\n");
+	}
+	bpb.SecPerClust = 0;
+	for(int i = 0; i < 1; i++){
+		bpb.SecPerClust += (unsigned int) buff[i];
+	}
+	printf("Sectors Per Cluster: %d\n", bpb.SecPerClust);
+	
+	//reserved
+	if((lseek(desc, 14, SEEK_SET)) == -1){
+		printf("Cannot seek fat32.img\n");
+	}
+	else if(!(read(desc, buff, 2) == 2)){
+		printf("Cannot read fat32.img\n");
+	}
+	bpb.ResvSecCnt = 0;
+	for(int i = 0; i < 2; i++){
+		bpb.ResvSecCnt += (unsigned int) buff[i];
+	}
+	printf("Reserved: %d\n", bpb.ResvSecCnt);
+
+	//numFat
+	if((lseek(desc, 16, SEEK_SET)) == -1){
+		printf("Cannot seek fat32.img\n");
+	}
+	else if(!(read(desc, buff, 1) == 1)){
+		printf("Cannot read fat32.img\n");
+	}
+	bpb.numFATs = 0;
+	for(int i = 0; i < 1; i++){
+		bpb.numFATs += (unsigned int) buff[i];
+	}
+	printf("Number of FATs: %d\n", bpb.numFATs);
+	
+	//totalSectors
+	if((lseek(desc, 32, SEEK_SET)) == -1){
+		printf("Cannot seek fat32.img\n");
+	}
+	else if(!(read(desc, buff, 4) == 4)){
+		printf("Cannot read fat32.img\n");
+	}
+	bpb.totalSectors = 0;
+	for(int i = 0; i < 4; i++){
+		bpb.totalSectors += (unsigned int) buff[i];
+	}
+	printf("Total Sectors: %d\n", bpb.totalSectors);
+	
+	//fatsize
+	if((lseek(desc, 36, SEEK_SET)) == -1){
+		printf("Cannot seek fat32.img\n");
+	}
+	else if(!(read(desc, buff, 4) == 4)){
+		printf("Cannot read fat32.img\n");
+	}
+	bpb.FATsize = 0;
+	for(int i = 0; i < 4; i++){
+		bpb.FATsize += (unsigned int) buff[i];
+	}
+	printf("FAT size: %d\n", bpb.FATsize);
+
+	//root cluster
+	if((lseek(desc, 44, SEEK_SET)) == -1){
+		printf("Cannot seek fat32.img\n");
+	}
+	else if(!(read(desc, buff, 4) == 4)){
+		printf("Cannot read fat32.img\n");
+	}
+	bpb.rootCuster = 0;
+	for(int i = 0; i < 4; i++){
+		bpb.rootCuster += (unsigned int) buff[i];
+	}
+	printf("Root Cluster: %d\n", bpb.rootCuster);
+
 }
 
 char *command_path(tokenlist *dirs, char *cmd)
