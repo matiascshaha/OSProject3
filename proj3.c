@@ -1,12 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+#define MAX_PATH 260
 
 typedef struct {
 	int size;
 	char **items;
 } tokenlist;
-
+char * buff[512];
 char *get_input(void);
 tokenlist *get_tokens(char *input);
 
@@ -14,17 +18,43 @@ tokenlist *new_tokenlist(void);
 void add_token(tokenlist *tokens, char *item);
 void free_tokens(tokenlist *tokens);
 
+struct BPB {
+	unsigned int BytesPerSec;
+	unsigned int SecPerClust;
+	unsigned int ResvSecCnt;
+	unsigned int numFATs;
+	unsigned int totalSectors;
+	unsigned int FATsize;
+	unsigned int rootCuster;
+};
+
 /*Helper functions*/
 int checkCommand(char *cmd); //check if a command is a built in or if we need to search $PATH
 char *command_path(tokenlist *dirs, char *cmd); //takes in directories from $PATH and returns valid command file
 int check_io(tokenlist * tokens);
-void spawn_proc (int in, int out, char *command); //used for execution in piping
 
 int main()
 {
-    FILE *fp;
-    fp = open("fat32.img",O_RDWR);
+	int fp;
+    if((fp = open("fat32.img",O_RDWR)) == -1){
+		printf("Cannot open fat32.img\n");
+		return 0;
+	}
+	else if(!(read(fp, buff, 512) == 512)){
+		printf("Cannot read fat32.img\n");
+		return 0;
+	}
+	char a;
+	for(int j = 0; j < 512; j++){
+		a = buff[j];
+	for (int i = 0; i < 8; i++) {
+      printf("%d", !!((a << i) & 0x80));
+	}
+	}
+	printf("\n");
 
+	return 0;
+	
 	while(1)
 	{
 		printf("$ ");
@@ -36,12 +66,12 @@ int main()
 			printf("token %d: (%s)\n", i, tokens->items[i]);
 		}*/
 		
-		if(!checkCommand(tokens->items[0]) && !pipe_cmd)
+		if(!checkCommand(tokens->items[0]))
 		{
 			//Take $PATH input and then parse on the ':'
 			char *path = getenv("PATH");
 			//store directories that we need to look through to run command
-			tokenlist *directories = get_tokens(path, ":");
+			tokenlist *directories = get_tokens(path);
 			//get path to command for execution
 			char *cmdpath = command_path(directories, tokens->items[0]);
 
@@ -107,6 +137,31 @@ int main()
 		free_tokens(tokens);
 	}
 	//free dynamic memory if necessary
+	return 0;
+}
+
+char *command_path(tokenlist *dirs, char *cmd)
+{
+	char *finalpath = (char*)calloc(MAX_PATH, sizeof(char));
+	char *command = (char*)calloc(5, sizeof(char));
+	command = cmd;
+
+	/*for (int i = 0; i < dirs->size; i++)
+	{
+		finalpath = dirs->items[i];
+		strcat(finalpath, "/");
+		strcat(finalpath, command);
+		if(access(finalpath, F_OK) == 0) //check to see if file exist
+        {
+            return finalpath;
+        }
+	}*/
+	return NULL; //if file not found, we'll throw an error.
+}
+
+int checkCommand(char *cmd)
+{
+	
 	return 0;
 }
 
