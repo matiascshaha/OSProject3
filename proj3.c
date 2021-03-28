@@ -34,113 +34,91 @@ int checkCommand(char *cmd); //check if a command is a built in or if we need to
 char *command_path(tokenlist *dirs, char *cmd); //takes in directories from $PATH and returns valid command file
 int check_io(tokenlist * tokens);
 
-int main()
+int main(int argc, char **argv)
 {
     int fd;
-    if((fd = open("fat32.img",O_RDWR)) == -1){
-        printf("Cannot open fat32.img\n");
-        return 0;
+    if(argc != 2)
+    {
+        printf("ERROR: wrong number of args\n");
+        exit(0);
     }
-    /*else if((lseek(fd, 11, SEEK_SET)) == -1){
-            printf("Cannot seek fat32.img\n");
-            return 0;
-    }*/
-    else if(!(read(fd, buff, 2) == 2)){
-        printf("Cannot read fat32.img\n");
-        return 0;
-    }
-    /*//lseek(desc, 11, SEEK_SET);
-    char a;
-    for(int j = 0; j < 2; j++){
-            a = buff[j];
-            for (int i = 0; i < 8; i++) {
-              printf("%d", !!((a << i) & 0x80));
-            }
-            printf(" ");
-    }
-    printf("\n");
 
-    return 0;
-    */while(1)
+    if((fd = open(argv[1], O_RDWR)) == -1)
+    {
+        printf("ERROR: cannot open %s\n", argv[1]);
+        exit(0);
+    }
+
+    else if(!(read(fd, buff, 2) == 2))
+    {
+        printf("ERROR: cannot read %s\n", argv[1]);
+        exit(0);
+    }
+
+    while(1)
     {
         printf("$ ");
         char *input = get_input();
-        //printf("whole input: %s\n", input);
-
         tokenlist *tokens = get_tokens(input);
-        /*for (int i = 0; i < tokens->size; i++) {
-printf("token %d: (%s)\n", i, tokens->items[i]);
-                }*/
 
-        if(!checkCommand(tokens->items[0]))
+        if(strcmp(tokens->items[0], "exit") == 0)
+            break;
+
+        else if(strcmp(tokens->items[0], "info") == 0)
         {
-            //Take $PATH input and then parse on the ':'
-            char *path = getenv("PATH");
-            //store directories that we need to look through to run command
-            tokenlist *directories = get_tokens(path);
-            //get path to command for execution
-            char *cmdpath = command_path(directories, tokens->items[0]);
-
-
-
-            if(strcmp(tokens->items[0], "exit") == 0){
-                break;
-            }
-
-            else if(strcmp(tokens->items[0], "info") == 0)
-            {
-                info(fd);
-            }
-
-            else if(strcmp(tokens->items[0], "size") == 0)
-            {}
-
-            else if(strcmp(tokens->items[0], "ls") == 0)
-            {}
-
-            else if(strcmp(tokens->items[0], "cd") == 0)
-            {}
-
-            else if(strcmp(tokens->items[0], "creat") == 0)
-            {}
-
-            else if(strcmp(tokens->items[0], "mkdir") == 0)
-            {}
-
-            else if(strcmp(tokens->items[0], "mv") == 0)
-            {}
-
-            else if(strcmp(tokens->items[0], "open") == 0)
-            {}
-
-            else if(strcmp(tokens->items[0], "close") == 0)
-            {}
-
-            else if(strcmp(tokens->items[0], "lseek") == 0)
-            {}
-
-            else if(strcmp(tokens->items[0], "read") == 0)
-            {}
-
-            else if(strcmp(tokens->items[0], "write") == 0)
-            {}
-
-            else if(strcmp(tokens->items[0], "rm") == 0)
-            {}
-
-            else if(strcmp(tokens->items[0], "cp") == 0)
-            {}
-
-                /*extra credit if we get to it
-                else if(strcmp(tokens->items[0], "rmdir") == 0)
-                {}
-                else if(strcmp(tokens->items[0], "cp") == 0 &&
-                                strcmp(tokens->items[1] == "-r") == 0)
-                {}
-                */
-            else //not a recognized command
-                printf("%s: command not found\n", tokens->items[0]);
+            info(fd);
         }
+
+        else if(strcmp(tokens->items[0], "size") == 0)
+        {}
+
+        else if(strcmp(tokens->items[0], "ls") == 0)
+        {}
+
+        else if(strcmp(tokens->items[0], "cd") == 0)
+        {}
+
+        else if(strcmp(tokens->items[0], "creat") == 0)
+        {}
+
+        else if(strcmp(tokens->items[0], "mkdir") == 0)
+        {}
+
+        else if(strcmp(tokens->items[0], "mv") == 0)
+        {}
+
+        else if(strcmp(tokens->items[0], "open") == 0)
+        {}
+
+        else if(strcmp(tokens->items[0], "close") == 0)
+        {}
+
+        else if(strcmp(tokens->items[0], "lseek") == 0)
+        {}
+
+        else if(strcmp(tokens->items[0], "read") == 0)
+        {}
+
+        else if(strcmp(tokens->items[0], "write") == 0)
+        {}
+
+        else if(strcmp(tokens->items[0], "rm") == 0)
+        {}
+
+        else if(strcmp(tokens->items[0], "cp") == 0)
+        {}
+
+        /*extra credit if we get to it
+        else if(strcmp(tokens->items[0], "rmdir") == 0)
+        {}
+        else if(strcmp(tokens->items[0], "cp") == 0 &&
+                        strcmp(tokens->items[1] == "-r") == 0)
+        {}
+        */
+
+        else //not a recognized command
+            printf("%s: command not found\n", tokens->items[0]);
+    
         free(input);
         free_tokens(tokens);
     }
@@ -237,7 +215,7 @@ void info(int desc){
 
 }
 
-char *command_path(tokenlist *dirs, char *cmd)
+/*char *command_path(tokenlist *dirs, char *cmd)
 {
     char *finalpath = (char*)calloc(MAX_PATH, sizeof(char));
     char *command = (char*)calloc(5, sizeof(char));
@@ -252,16 +230,9 @@ char *command_path(tokenlist *dirs, char *cmd)
     {
         return finalpath;
     }
-    }*/
+ 
     return NULL; //if file not found, we'll throw an error.
-}
-
-int checkCommand(char *cmd)
-{
-
-    return 0;
-
-}
+}*/
 
 tokenlist *new_tokenlist(void)
 {
