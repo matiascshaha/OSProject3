@@ -30,11 +30,6 @@ struct BPB {
     unsigned int rootCuster;
 };
 
-/*Helper functions*/
-int checkCommand(char *cmd); //check if a command is a built in or if we need to search $PATH
-char *command_path(tokenlist *dirs, char *cmd); //takes in directories from $PATH and returns valid command file
-int check_io(tokenlist * tokens);
-
 int main(int argc, char **argv)
 {
     int fd;
@@ -234,25 +229,6 @@ void info(int desc)
     printf("Root Cluster: %d\n", bpb.rootCuster);
 
 }
-
-/*char *command_path(tokenlist *dirs, char *cmd)
-{
-    char *finalpath = (char*)calloc(MAX_PATH, sizeof(char));
-    char *command = (char*)calloc(5, sizeof(char));
-    command = cmd;
-
-    /*for (int i = 0; i < dirs->size; i++)
-    {
-            finalpath = dirs->items[i];
-            strcat(finalpath, "/");
-            strcat(finalpath, command);
-            if(access(finalpath, F_OK) == 0) //check to see if file exist
-    {
-        return finalpath;
-    }
- 
-    return NULL; //if file not found, we'll throw an error.
-}*/
 
 tokenlist *new_tokenlist(void)
 {
