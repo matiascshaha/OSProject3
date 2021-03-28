@@ -18,6 +18,7 @@ tokenlist *new_tokenlist(void);
 void add_token(tokenlist *tokens, char *item);
 void free_tokens(tokenlist *tokens);
 void info(int desc);
+void fileSize(const char *file);
 
 struct BPB {
     unsigned int BytesPerSec;
@@ -70,7 +71,10 @@ int main(int argc, char **argv)
         }
 
         else if(strcmp(tokens->items[0], "size") == 0)
-        {}
+        {
+            fileSize(tokens->items[1]);
+
+        }
 
         else if(strcmp(tokens->items[0], "ls") == 0)
         {}
@@ -125,8 +129,24 @@ int main(int argc, char **argv)
     //free dynamic memory if necessary
     return 0;
 }
+void fileSize(const char *file)
+{
+    unsigned int fsize;
+    if(access(file, F_OK) == 0) 
+    {
+        int fd = open(file, O_RDONLY); 
+        off_t pos = lseek(fd, 0, SEEK_CUR); //start position of file pointer
+        fsize = lseek(fd, 0, SEEK_END); //traverse file and store size
+        lseek(fd, pos, SEEK_SET); //set file pointer back to start
+        printf("%s size: %d bytes\n", file, fsize);
+        close(fd); //close file
+    } 
+    else 
+        printf("ERROR: %s does not exist\n", file);
+}
 
-void info(int desc){
+void info(int desc)
+{
     struct BPB bpb;
     unsigned char a[2];
 
