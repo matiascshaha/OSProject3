@@ -17,7 +17,8 @@ tokenlist *get_tokens(char *input);
 tokenlist *new_tokenlist(void);
 void add_token(tokenlist *tokens, char *item);
 void free_tokens(tokenlist *tokens);
-void info(int desc);
+void getInfo(int desc);
+void printInfo();
 void fileSize(const char *file);
 
 struct BPB {
@@ -29,6 +30,8 @@ struct BPB {
     unsigned int FATsize;
     unsigned int rootCuster;
 };
+
+struct BPB bpb;
 
 int main(int argc, char **argv)
 {
@@ -50,7 +53,7 @@ int main(int argc, char **argv)
         printf("ERROR: cannot read %s\n", argv[1]);
         exit(0);
     }
-
+    getInfo();
     while(1)
     {
         printf("$ ");
@@ -62,7 +65,7 @@ int main(int argc, char **argv)
 
         else if(strcmp(tokens->items[0], "info") == 0)
         {
-            info(fd);
+            printInfo();
         }
 
         else if(strcmp(tokens->items[0], "size") == 0)
@@ -107,17 +110,17 @@ int main(int argc, char **argv)
         else if(strcmp(tokens->items[0], "cp") == 0)
         {}
 
-        /*extra credit if we get to it
-        else if(strcmp(tokens->items[0], "rmdir") == 0)
-        {}
-        else if(strcmp(tokens->items[0], "cp") == 0 &&
-                        strcmp(tokens->items[1] == "-r") == 0)
-        {}
-        */
+            /*extra credit if we get to it
+            else if(strcmp(tokens->items[0], "rmdir") == 0)
+            {}
+            else if(strcmp(tokens->items[0], "cp") == 0 &&
+                            strcmp(tokens->items[1] == "-r") == 0)
+            {}
+            */
 
         else //not a recognized command
             printf("%s: command not found\n", tokens->items[0]);
-    
+
         free(input);
         free_tokens(tokens);
     }
@@ -127,22 +130,33 @@ int main(int argc, char **argv)
 void fileSize(const char *file)
 {
     unsigned int fsize;
-    if(access(file, F_OK) == 0) 
+    if(access(file, F_OK) == 0)
     {
-        int fd = open(file, O_RDONLY); 
+        int fd = open(file, O_RDONLY);
         off_t pos = lseek(fd, 0, SEEK_CUR); //start position of file pointer
         fsize = lseek(fd, 0, SEEK_END); //traverse file and store size
         lseek(fd, pos, SEEK_SET); //set file pointer back to start
         printf("%s size: %d bytes\n", file, fsize);
         close(fd); //close file
-    } 
-    else 
+    }
+    else
         printf("ERROR: %s does not exist\n", file);
 }
 
-void info(int desc)
+void printInfo()
 {
-    struct BPB bpb;
+    printf("Bytes Per Sector: %d\n", bpb.BytesPerSec);
+    printf("Sectors Per Cluster: %d\n", bpb.SecPerClust);
+    printf("Reserved: %d\n", bpb.ResvSecCnt);
+    printf("Number of FATs: %d\n", bpb.numFATs);
+    printf("Total Sectors: %d\n", bpb.totalSectors);
+    printf("FAT size: %d\n", bpb.FATsize);
+    printf("Root Cluster: %d\n", bpb.rootCuster);
+
+}
+
+void getInfo(int desc)
+{
     unsigned char a[2];
 
     if((lseek(desc, 11, SEEK_SET)) == -1){
@@ -155,7 +169,6 @@ void info(int desc)
     for(int i = 0; i < 2; i++){
         bpb.BytesPerSec += (unsigned int) buff[i];
     }
-    printf("Bytes Per Sector: %d\n", bpb.BytesPerSec);
     memset(buff,0,4);       //reset buffer to empty
     //secperclust
     if(!(read(desc, buff, 1) == 1)){
@@ -165,7 +178,6 @@ void info(int desc)
     for(int i = 0; i < 1; i++){
         bpb.SecPerClust += (unsigned int) buff[i];
     }
-    printf("Sectors Per Cluster: %d\n", bpb.SecPerClust);
     memset(buff,0,4);       //reset buffer to empty
 
     //reserved
@@ -176,7 +188,6 @@ void info(int desc)
     for(int i = 0; i < 2; i++){
         bpb.ResvSecCnt += (unsigned int) buff[i];
     }
-    printf("Reserved: %d\n", bpb.ResvSecCnt);
     memset(buff,0,4);       //reset buffer to empty
 
     //numFat
@@ -187,7 +198,6 @@ void info(int desc)
     for(int i = 0; i < 1; i++){
         bpb.numFATs += (unsigned int) buff[i];
     }
-    printf("Number of FATs: %d\n", bpb.numFATs);
     memset(buff,0,4);       //reset buffer to empty
 
     //totalSectors
@@ -201,7 +211,6 @@ void info(int desc)
     for(int i = 0; i < 4; i++){
         bpb.totalSectors += (unsigned int) buff[i];
     }
-    printf("Total Sectors: %d\n", bpb.totalSectors);
     memset(buff,0,4);       //reset buffer to empty
 
     //fatsize
@@ -212,7 +221,6 @@ void info(int desc)
     for(int i = 0; i < 4; i++){
         bpb.FATsize += (unsigned int) buff[i];
     }
-    printf("FAT size: %d\n", bpb.FATsize);
     memset(buff,0,4);       //reset buffer to empty
 
     //root cluster
@@ -226,7 +234,6 @@ void info(int desc)
     for(int i = 0; i < 4; i++){
         bpb.rootCuster += (unsigned int) buff[i];
     }
-    printf("Root Cluster: %d\n", bpb.rootCuster);
 
 }
 
@@ -303,3 +310,5 @@ void free_tokens(tokenlist *tokens)
     free(tokens->items);
     free(tokens);
 }
+
+
