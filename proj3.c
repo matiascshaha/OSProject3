@@ -53,7 +53,7 @@ int main(int argc, char **argv)
         printf("ERROR: cannot read %s\n", argv[1]);
         exit(0);
     }
-    getInfo();
+    getInfo(fd);
     while(1)
     {
         printf("$ ");
@@ -310,5 +310,3 @@ void free_tokens(tokenlist *tokens)
     free(tokens->items);
     free(tokens);
 }
-
-
