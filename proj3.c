@@ -20,6 +20,8 @@ void free_tokens(tokenlist *tokens);
 void getInfo(int desc);
 void printInfo();
 void fileSize(const char *file);
+void listDir(int desc);
+int findCluster(int x);
 
 struct BPB {
     unsigned int BytesPerSec;
@@ -31,11 +33,24 @@ struct BPB {
     unsigned int rootCuster;
 };
 
+struct DIRENTRY{
+	unsigned char DIRName[11];
+	unsigned char DIRAttr;
+	unsigned int startCluster;
+	unsigned int DIRSize;
+}__attribute__((packed));
+
+struct DIRENTRY dir[16];
+
+int root[100];
+int rootTrack;
 struct BPB bpb;
 
 int main(int argc, char **argv)
 {
+	rootTrack = 0;
     int fd;
+	int nextCluster;
     if(argc != 2)
     {
         printf("ERROR: wrong number of args\n");
@@ -54,6 +69,50 @@ int main(int argc, char **argv)
         exit(0);
     }
     getInfo(fd);
+	
+	//set initial root cluster into array
+	root[rootTrack] = bpb.rootCuster;
+	rootTrack++;
+	if((lseek(fd, 16392, SEEK_SET)) == -1){
+        printf("Cannot seek fat32.img\n");
+    }
+	
+	while(1){
+		if(!(read(fd, buff, 4) == 4))
+		{
+			printf("ERROR: cannot read %s\n", argv[1]);
+			exit(0);
+		}
+		nextCluster = 0;
+		for(int i = 0; i < 4; i++){
+			nextCluster += (unsigned int) buff[i];
+		}
+		if( nextCluster < 268435448)
+		{
+			root[rootTrack] = nextCluster;
+			nextCluster = findCluster(nextCluster);
+			if((lseek(fd, nextCluster, SEEK_SET)) == -1){
+				printf("Cannot seek fat32.img\n");
+			}
+			rootTrack++;
+		}
+		else
+			break;
+	};
+	/*char * buffer[11];
+	//DIRENTRY * dir;
+	if((lseek(fd, 1049608, SEEK_SET)) == -1){
+        printf("Cannot seek fat32.img\n");
+    }
+	//read(fd, dir);
+	if(!(read(fd, buffer, 11) == 11))
+		{
+			printf("ERROR: cannot read %s\n", argv[1]);
+			exit(0);
+		}
+		printf("%s\n", buffer);
+*/
+	
     while(1)
     {
         printf("$ ");
@@ -75,7 +134,9 @@ int main(int argc, char **argv)
         }
 
         else if(strcmp(tokens->items[0], "ls") == 0)
-        {}
+        {
+			listDir(fd);
+		}
 
         else if(strcmp(tokens->items[0], "cd") == 0)
         {}
@@ -234,6 +295,7 @@ void getInfo(int desc)
     for(int i = 0; i < 4; i++){
         bpb.rootCuster += (unsigned int) buff[i];
     }
+	memset(buff,0,4);
 
 }
 
@@ -309,4 +371,37 @@ void free_tokens(tokenlist *tokens)
         free(tokens->items[i]);
     free(tokens->items);
     free(tokens);
+}
+
+int findCluster(int x){
+	if(x < 2)
+		return 2;
+	return ((bpb.ResvSecCnt * bpb.BytesPerSec) + (bpb.numFATs * bpb.FATsize * bpb.BytesPerSec)) + ((x - 2) * bpb.BytesPerSec);
+}
+
+//ls the current directory
+void listDir(int desc)
+{
+	int i;
+    int offset = findCluster(bpb.rootCuster);
+    if((lseek(desc, offset, SEEK_SET)) == -1)
+		printf("Cannot seek fat32.img\n");
+
+	//loop fills dir[] with a directory in each slot or until done
+	//need file names still
+    for (i = 0; i < 16; i++)
+    {
+        if(!(read(desc, &dir[i], 32) == 32))
+			printf("Cannot read fat32.img\n");
+		
+		//checks if Name and Attribute of directory exist
+        if ((dir[i].DIRName[0] != (char)0xe5) &&
+            (dir[i].DIRAttr == 0x1 || dir[i].DIRAttr == 0x10 || dir[i].DIRAttr == 0x20))
+        {
+            char *directory = malloc(sizeof(char) *11);
+            memset(directory, '\0', 11);
+            memcpy(directory, dir[i].DIRName, 11);
+            printf("%s\n", directory);
+        }
+    }
 }
