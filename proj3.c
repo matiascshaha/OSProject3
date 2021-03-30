@@ -131,7 +131,19 @@ int main(int argc, char **argv)
 
         else if(strcmp(tokens->items[0], "size") == 0)
         {
-            fileSize(tokens->items[1]);
+			int check;
+			tokenlist *tok;
+			for(int i = 0; i < 16; i++){
+				tok = get_tokens(dir[i].DIRName);	
+				if((check = strcmp(tokens->items[1], tok->items[0])) == 0){
+					check = 0;
+					printf("%d\n", dir[i].DIRSize);
+					break;
+				}
+			}
+			if(check != 0)
+				printf("ERROR: %s does not exist.", tokens->items[1]);
+            //fileSize(tokens->items[1]);
 
         }
 
@@ -142,8 +154,6 @@ int main(int argc, char **argv)
 			if(tokens->size == 1 || strcmp(tokens->items[1], ".") == 0)
 				listDir(fd, currentCluster);
 			else{
-				tokenlist * tok;
-				int x;
 				for(int i = 0; i < 16; i++){
 					tok = get_tokens(dir[i].DIRName);	
 					if((check = strcmp(tokens->items[1], tok->items[0])) == 0){
@@ -404,7 +414,6 @@ void listDir(int desc, int cluster)
 {
 	if(cluster > currentCluster){
 		int offset = findCluster(cluster);
-		printf("%d\n", offset);
 		if((lseek(desc, offset, SEEK_SET)) == -1)
 			printf("Cannot seek fat32.img\n");
 
@@ -424,6 +433,7 @@ void listDir(int desc, int cluster)
 		offset = findCluster(currentCluster);
 		if((lseek(desc, offset, SEEK_SET)) == -1)
 			printf("Cannot seek fat32.img\n");
+		getDir(desc, currentCluster);
 	}
 	else{
 		for (int i = 0; i < 16; i++)
