@@ -3,6 +3,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <stdint.h>
 
 #define MAX_PATH 260
 
@@ -37,16 +38,16 @@ struct BPB {
 struct DIRENTRY{
 	unsigned char DIRName[11];
 	unsigned char DIRAttr;
-	unsigned int DIRNTRes;
-	unsigned int DIRCTTenth;
-	unsigned int DIRCTime;
-	unsigned int DIRCDate;
-	unsigned int LADate;
-	unsigned int highCluster;
-	unsigned int DIRWTime;
-	unsigned int DIRWDate;
-	unsigned int lowCluster;
-	unsigned int DIRSize;
+	uint8_t DIRNTRes;
+	uint8_t DIRCTTenth;
+	uint16_t DIRCTime;
+	uint16_t DIRCDate;
+	uint16_t LADate;
+	uint16_t highCluster;
+	uint16_t DIRWTime;
+	uint16_t DIRWDate;
+	uint16_t lowCluster;
+	uint32_t DIRSize;
 }__attribute__((packed));
 
 
@@ -113,19 +114,6 @@ int main(int argc, char **argv)
 			break;
 	};
 	currentCluster = 2;
-	/*char * buffer[11];
-	//DIRENTRY * dir;
-	if((lseek(fd, 1049608, SEEK_SET)) == -1){
-        printf("Cannot seek fat32.img\n");
-    }
-	//read(fd, dir);
-	if(!(read(fd, buffer, 11) == 11))
-		{
-			printf("ERROR: cannot read %s\n", argv[1]);
-			exit(0);
-		}
-		printf("%s\n", buffer);
-*/
 	
     while(1)
     {
@@ -149,21 +137,22 @@ int main(int argc, char **argv)
 
         else if(strcmp(tokens->items[0], "ls") == 0)
         {
+			int check;
+			tokenlist *tok;
 			if(tokens->size == 1 || strcmp(tokens->items[1], ".") == 0)
 				listDir(fd, currentCluster);
 			else{
-				int check;
-				tokenlist *tok;
+				tokenlist * tok;
+				int x;
 				for(int i = 0; i < 16; i++){
 					tok = get_tokens(dir[i].DIRName);	
-					check = (strcmp(tokens->items[1], tok->items[0]));
-					printf("%d\n", check);
-					if(strcmp(tokens->items[1], tok->items[0]) == 0){
-						printf("in the else\n");
+					if((check = strcmp(tokens->items[1], tok->items[0])) == 0){
 						listDir(fd, dir[i].lowCluster);
 						break;
 					}
 				}
+				if(check != 0)
+					printf("ERROR: %s does not exist.", tokens->items[1]);
 			}
 		}
 
@@ -413,22 +402,40 @@ int findCluster(int x){
 //ls the current directory
 void listDir(int desc, int cluster)
 {
-	//loop fills dir[] with a directory in each slot or until done
-	//need file names still
-    for (int i = 0; i < 16; i++)
-    {
+	if(cluster > currentCluster){
+		int offset = findCluster(cluster);
+		printf("%d\n", offset);
+		if((lseek(desc, offset, SEEK_SET)) == -1)
+			printf("Cannot seek fat32.img\n");
 
-		//checks if Name and Attribute of directory exist
-        if ((dir[i].DIRName[0] != (char)0xe5) &&
-            (dir[i].DIRAttr == 0x1 || dir[i].DIRAttr == 0x10 || dir[i].DIRAttr == 0x20))
-        {
-            /*char *directory = malloc(sizeof(char) *11);
-            memset(directory, '\0', 11);
-            memcpy(directory, dir[i].DIRName, 11);
-            printf("%s\n", directory);*/
-			printf("%s\n", dir[i].DIRName, 11);
-        }
-    }
+		//loop fills dir[] with a directory in each slot or until done
+		//need file names still
+		for (int i = 0; i < 16; i++)
+		{
+			if(!(read(desc, &dir[i], 32) == 32))
+				printf("Cannot read fat32.img\n");
+			//checks if Name and Attribute of directory exist
+			if ((dir[i].DIRName[0] != (char)0xe5) &&
+				(dir[i].DIRAttr == 0x1 || dir[i].DIRAttr == 0x10 || dir[i].DIRAttr == 0x20))
+			{
+				printf("%s\n", dir[i].DIRName);
+			}
+		}
+		offset = findCluster(currentCluster);
+		if((lseek(desc, offset, SEEK_SET)) == -1)
+			printf("Cannot seek fat32.img\n");
+	}
+	else{
+		for (int i = 0; i < 16; i++)
+		{
+			//checks if Name and Attribute of directory exist
+			if ((dir[i].DIRName[0] != (char)0xe5) &&
+				(dir[i].DIRAttr == 0x1 || dir[i].DIRAttr == 0x10 || dir[i].DIRAttr == 0x20))
+			{
+				printf("%s\n", dir[i].DIRName);
+			}
+		}
+	}
 }
 
 void getDir(int desc, int cluster){
