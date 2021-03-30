@@ -152,9 +152,15 @@ int main(int argc, char **argv)
 			if(tokens->size == 1 || strcmp(tokens->items[1], ".") == 0)
 				listDir(fd, currentCluster);
 			else{
+				int check;
+				tokenlist *tok;
 				for(int i = 0; i < 16; i++){
-					if(strcmp(tokens->items[1], dir[i].DIRName) == 0){
-						listDir(fd, dir[i].highCluster);
+					tok = get_tokens(dir[i].DIRName);	
+					check = (strcmp(tokens->items[1], tok->items[0]));
+					printf("%d\n", check);
+					if(strcmp(tokens->items[1], tok->items[0]) == 0){
+						printf("in the else\n");
+						listDir(fd, dir[i].lowCluster);
 						break;
 					}
 				}
@@ -416,10 +422,11 @@ void listDir(int desc, int cluster)
         if ((dir[i].DIRName[0] != (char)0xe5) &&
             (dir[i].DIRAttr == 0x1 || dir[i].DIRAttr == 0x10 || dir[i].DIRAttr == 0x20))
         {
-            char *directory = malloc(sizeof(char) *11);
+            /*char *directory = malloc(sizeof(char) *11);
             memset(directory, '\0', 11);
             memcpy(directory, dir[i].DIRName, 11);
-            printf("%s\n", directory);
+            printf("%s\n", directory);*/
+			printf("%s\n", dir[i].DIRName, 11);
         }
     }
 }
