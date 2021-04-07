@@ -1,4 +1,4 @@
-else if(strcmp(tokens->items[0], "write") == 0)
+        else if(strcmp(tokens->items[0], "write") == 0)
         {
             /************************ ERROR CHECKING ************************/
             tokenlist *tok;
@@ -91,16 +91,17 @@ else if(strcmp(tokens->items[0], "write") == 0)
 
                 //if offset + size is larger than file, need to extend file length 
                 unsigned int offset = offsetPos + bytes;
+                unsigned int newBytes = Bytes(bytes, tokens->items[3]);
+                printf("New Bytes%d\n", newBytes);
                 if(offset > filesize)
                 {
                     //printf("offset + SIZE is larger than filesize\n");
-                    
-                    myWriteFunc(fd, offsetPos, bytes, fileCluster, filesize, 1, str);
+                    myWriteFunc(fd, offsetPos, newBytes, fileCluster, filesize, 1, str);
                 }
                 else
                 {
                     //have the fileExtend flag set to 0
-                    myWriteFunc(fd, offsetPos, bytes, fileCluster, filesize, 0, str);
+                    myWriteFunc(fd, offsetPos, newBytes, fileCluster, filesize, 0, str);
                 }
 
             }
@@ -108,7 +109,7 @@ else if(strcmp(tokens->items[0], "write") == 0)
                 continue;
         }
         
-        void myWriteFunc(int fd, int offset, int bytesToWrite, int fileCluster, 
+ void myWriteFunc(int fd, int offset, int bytesToWrite, int fileCluster, 
                 int filesize, int fileExtend, char* string)
 {
     findFatSequence(fd, fileCluster);
@@ -121,39 +122,47 @@ else if(strcmp(tokens->items[0], "write") == 0)
         printf("Filename: %s\n", string);
         printf("Filesize: %d\n", filesize);
         int extraClusters;
-        int currentClusters = (int)(filesize / bpb.BytesPerSec);
-        int finalCluster = (int)(offset + bytesToWrite) / bpb.BytesPerSec;
+        int currentClusters = (int)(filesize / 512);
+        int finalCluster = (int)(offset + bytesToWrite) / 512;
 
         printf("Current Clusters: %d\n", currentClusters);
         printf("Final Cluster: %d\n", finalCluster);
 
-        if((filesize % bpb.BytesPerSec) > 0)
+        if((filesize % 512) > 0)
             currentClusters++;
 
-        if((offset + bytesToWrite) % bpb.BytesPerSec > 0)
+        if((offset + bytesToWrite) % 512 > 0)
             finalCluster++;
 
         extraClusters = finalCluster - currentClusters;
         printf("Extra Clusters needed: %d\n", extraClusters);
         int current = fileCluster;
         int track = 0;
+        int trackFAT = 0;
         int clusterNum;
+
+        //find empty cluster in FAT
         for(int i = 0; i < extraClusters; i++)
         {
             while(1)
             {
+                //printf("TEST\n");
                 //seek to start of FAT
                 lseek(fd, 16384+track, SEEK_SET);
                 //read 4 bytes
                 read(fd, &buf, 4);
                 if(buf == 0)
-                {
+                {   
                     clusterNum = track/4;
+                    printf("Cluster num: %X\n", clusterNum);
+
+                    trackFAT++;
                     break;
                 }
-                track++;
+                track += 4;
             }
-
+            
+            //adds the new cluster and makes the empty cluster the new end
             lseek(fd, 16384 + fat[fatTrack]*4, SEEK_SET);
             buf = (int)clusterNum;
             write(fd, &buf, 4);
@@ -163,10 +172,41 @@ else if(strcmp(tokens->items[0], "write") == 0)
             fatTrack++;
             fat[fatTrack] = clusterNum;
         }
+
+        int totalBytes = bytesToWrite;
+        int bytesRemaining = findCluster(fileCluster+1) - filePosOffset;
+        //go back to the start of the file
+        lseek(fd, filePosOffset, SEEK_SET);
+
+        for(int i = 0; i <= extraClusters; i++)
+        {   
+            /*  char string[strlen(tokens->items[3])];
+                strcpy(string, tokens->items[3]);
+                char *str = string;
+                str++;
+                str[strlen(str) - 1] = 0; */
+
+            unsigned char *buffer = malloc(sizeof(unsigned char)*bytesRemaining);
+            string = strncpy(&buffer, string, bytesRemaining);
+            printf("%s\n", buffer);
+
+
+            write(fd, &buffer, bytesRemaining);
+            totalBytes -= bytesRemaining;
+            //
+            lseek(fd, findCluster(fat[fatTrack - trackFAT + 1]), SEEK_SET);
+            if(totalBytes > 512)
+                bytesRemaining = 512;
+            else
+                bytesRemaining = totalBytes;
+            
+            printf("Bytes remaining: %d\n", bytesRemaining);
+        }
+
+        printf("Total Bytes:%d\n", totalBytes);
     }
+
     else //no clusters need to be allocated
     {
 
     }
-
-}
