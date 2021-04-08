@@ -33,8 +33,10 @@ int checkAttr(char* from, char* to); //checks to see if mv args are legal
 void moveEntry(int desc, int index, int moveToCluster);
 void remEntry(int desc, int off, int current);
 void copyFile(int desc, int newClust, int origClust);
-void myReadFunc(int fd, int filePosOffset,int bytesToRead, int fileCluster, int file_size,int read_to_end,char *filename);
-
+void myReadFunc(int fd, int filePosOffset,int bytesToRead, int fileCluster, 
+                int file_size,int read_to_end,char *filename);
+void myWriteFunc(int fd, int offset, int bytesToWrite, int fileCluster, 
+                int filesize, int fileExtend, char* string, char* filename);
 struct BPB {
     unsigned int BytesPerSec;
     unsigned int SecPerClust;
@@ -597,7 +599,118 @@ int main(int argc, char **argv)
         }
 
         else if(strcmp(tokens->items[0], "write") == 0)
-        {}
+        {
+
+            /************************ ERROR CHECKING ************************/
+            tokenlist *tok;
+            //error flags
+            int exist = 0;
+            int isDir = 0;
+            int isNotOpen = 0;
+            int error = 0; //if there are no errors, continue with write
+            unsigned int fileCluster;
+            unsigned int filesize;
+            unsigned int fileOffset;
+            unsigned int offsetPos;
+            //check for correct number of args
+            if(tokens->size != 4)
+            {  
+                printf("ERROR: wrong number of arguments\n");
+                continue;
+            }
+
+            //check to see if file exist
+            for(int i = 0; i < dirTrack; i++)
+            {
+                tok = get_tokens(dir[i].DIRName);
+                if((strcmp(tokens->items[1], tok->items[0]) == 0)
+                    && (dir[i].DIRAttr == 0x20))
+                {
+                    exist = 1;
+                    filesize = dir[i].DIRSize;
+                    fileCluster = dir[i].lowCluster;
+                    break;
+                }
+                else if((strcmp(tokens->items[1], tok->items[0]) == 0)
+                    && (dir[i].DIRAttr == 0x10))
+                {
+                    printf("ERROR: %s is a Directory\n", tokens->items[1]);
+                    error = 1;
+                    isDir = 1;
+                    break;
+                }
+            }
+
+            if(exist)
+            {
+                //check open table to see if file is open for writing
+                for(int x = 0; x < 100; x++)
+                {
+                    //check if file is in open table
+                    if(strcmp(tokens->items[1], op[x].filename) == 0)
+                    {
+                        offsetPos = op[x].offset_position;
+                        isNotOpen = 0;
+                        break;
+                    }
+                    isNotOpen = 1; //flag will remain 1 unless file is found
+                }
+            }
+            //if file does not exist
+            if(!exist && !isDir)
+            {
+                printf("ERROR: %s does not exist\n", tokens->items[1]);
+                error = 1;
+                continue;
+            }
+
+            if(isNotOpen)
+            {
+                printf("ERROR: %s is not open for writing\n", tokens->items[1]);
+                error = 1;
+                continue;
+            }
+            /************************ ERROR CHECKING ************************/
+
+            //if we don't have any errors, continue to write
+            if(!error)
+            {   
+                unsigned int bytes = atoi(tokens->items[2]);
+                //offset in the data region 
+                unsigned int filePosOffset = findCluster(fileCluster) + offsetPos;
+                //strip quotes from filename
+                char string[strlen(tokens->items[3])];
+                strcpy(string, tokens->items[3]);
+                char *str = string;
+                str++;
+                str[strlen(str) - 1] = 0;
+
+                //if offset + size is larger than file, need to extend file length 
+                unsigned int offset = offsetPos + bytes;
+
+                if(offset > filesize)
+                {
+                    //printf("offset + SIZE is larger than filesize\n");
+                    myWriteFunc(fd, offsetPos, bytes, fileCluster,
+                                filesize, 1, str, tokens->items[1]);
+                }
+                else
+                {
+                    //have the fileExtend flag set to 0
+                    myWriteFunc(fd, offsetPos, bytes, fileCluster,
+                                filesize, 0, str, tokens->items[1]);
+                }
+
+                //rest error flags
+                exist = 0;
+                isDir = 0;
+                isNotOpen = 0;
+                error = 0; 
+            }
+            else //prompt user for another command
+                continue;
+
+        }
 
         else if(strcmp(tokens->items[0], "rm") == 0)
         {
@@ -741,6 +854,129 @@ int main(int argc, char **argv)
     //free dynamic memory if necessary
     return 0;
 }
+
+void myWriteFunc(int fd, int offset, int bytesToWrite, int fileCluster, 
+                int filesize, int fileExtend, char* string ,char* filename)
+{
+    findFatSequence(fd, fileCluster);
+    unsigned int filePosOffset = findCluster(fileCluster) + offset;
+    unsigned int buf;
+
+    //if STRING is larger than SIZE, pass only first SIZE bytes
+    char newstr[bytesToWrite];
+    if(strlen(string) >= bytesToWrite)
+        strncpy(newstr, string, bytesToWrite);
+    
+    //just give it the same str, newstr is 'BytesToWrite' size
+    //so str will only take up as much as needed followed by 0's
+    else 
+        strcpy(newstr, string);
+
+    //need to extend the length of the file
+    if(fileExtend)
+    {
+        int extraClusters;
+        int currentClusters = (int)(filesize / 512);
+        int finalCluster = (int)(offset + bytesToWrite) / 512;
+
+        if((filesize % 512) > 0)
+            currentClusters++;
+
+        if((offset + bytesToWrite) % 512 > 0)
+            finalCluster++;
+
+        extraClusters = finalCluster - currentClusters;
+        int current = fileCluster;
+        int track = 0;
+        int trackFAT = 0;
+        int clusterNum;
+
+        //find empty cluster in FAT
+        for(int i = 0; i < extraClusters; i++)
+        {
+            while(1)
+            {
+                //printf("TEST\n");
+                //seek to start of FAT
+                lseek(fd, 16384+track, SEEK_SET);
+                //read 4 bytes
+                read(fd, &buf, 4);
+                if(buf == 0)
+                {   
+                    clusterNum = track/4;
+                    printf("Cluster num: %X\n", clusterNum);
+
+                    trackFAT++;
+                    break;
+                }
+                track += 4;
+            }
+            
+            //adds the new cluster and makes the empty cluster the new end
+            lseek(fd, 16384 + fat[fatTrack-1]*4, SEEK_SET);
+            buf = (int)clusterNum;
+            write(fd, &buf, 4);
+            buf = (int)0x0FFFFFF8;
+            lseek(fd, 16384 + clusterNum*4, SEEK_SET);
+            write(fd, &buf, 4);
+            fat[fatTrack++] = clusterNum;
+        }
+
+        int totalBytes = bytesToWrite;
+        int bytesRemaining = findCluster(fileCluster+1) - filePosOffset;
+
+        //go back to the start of the file
+        lseek(fd, filePosOffset, SEEK_SET);
+        
+        //unsigned char newString[bytesToWrite];
+        int tracker = 0; //track string position
+        //strcpy(newString, string);
+        for(int i = 0; i <= extraClusters; i++)
+        {   
+            unsigned char buffer[bytesRemaining];
+            memcpy(&buffer, &newstr[tracker], bytesRemaining);
+            tracker += bytesRemaining;
+
+            write(fd, &buffer, bytesRemaining);
+            totalBytes -= bytesRemaining;
+            //
+            lseek(fd, findCluster(fat[fatTrack - trackFAT + 1]), SEEK_SET);
+            if(totalBytes > 512)
+                bytesRemaining = 512;
+            else
+                bytesRemaining = totalBytes;
+            printf("Bytes remaining: %d\n", bytesRemaining);
+        }
+
+        //update file size
+        printf("Total Bytes:%d\n", totalBytes);
+        tokenlist *tok;
+        for(int i = 0; i < dirTrack; i++)
+        {   
+            tok = get_tokens(dir[i].DIRName);
+            if(strcmp(filename, tok->items[0]) == 0)
+            {
+                dir[i].DIRSize += extraClusters*512;
+                printf("New file size:%d\n", dir[i].DIRSize);
+            }
+        }
+    }
+
+    else //no clusters need to be allocated
+    {
+        lseek(fd, filePosOffset, SEEK_SET);
+        write(fd, &newstr, bytesToWrite);
+    }
+
+    //return to current cluster
+    if ((lseek(fd, findCluster(currentCluster), SEEK_SET)) == -1){
+        printf("Cannot seek fat32.img\n");
+    }
+    
+    findFatSequence(fd, currentCluster);
+    getDir(fd, currentCluster);
+}
+
 //reads passed file from passed starting offset x # of bytes
 void myReadFunc(int fd, int filePosOffset,int bytesToRead, int fileCluster, int file_size,int read_to_end,char *filename)
 {
