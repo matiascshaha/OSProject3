@@ -985,9 +985,8 @@ void myReadFunc(int fd, int filePosOffset,int bytesToRead, int fileCluster, int 
             }
         }
     }
-
-
 }
+
 //moves file or directory to provided directory
 void moveEntry(int desc, int index, int moveToCluster)
 {
@@ -1488,23 +1487,6 @@ void makeDir(int fd,int cluster,char *filename)
         }
     }
 }
-//displays files filesize
-void fileSize(const char *file)
-{
-    unsigned int fsize;
-    if(access(file, F_OK) == 0)
-    {
-        int fd = open(file, O_RDONLY);
-        off_t pos = lseek(fd, 0, SEEK_CUR); //start position of file pointer
-        fsize = lseek(fd, 0, SEEK_END); //traverse file and store size
-        lseek(fd, pos, SEEK_SET); //set file pointer back to start
-        printf("%s size: %d bytes\n", file, fsize);
-        close(fd); //close file
-    }
-    else
-        printf("ERROR: %s does not exist\n", file);
-}
-
 
 void printInfo()
 {
@@ -1748,8 +1730,6 @@ void listDir(int desc, int cluster)
                     printf("%s\n", dir[x].DIRName);
                 }
             }
-
-
         }
 
         //reset everything back to current cluster settings
@@ -1778,8 +1758,6 @@ void listDir(int desc, int cluster)
                     printf("%s\n",dir[x].DIRName);
                 }
             }
-
-
         }
     }
 }
@@ -1947,10 +1925,18 @@ void myWriteFunc(int fd, int offset, int bytesToWrite, int fileCluster,
         write(fd, &newstr, bytesToWrite);
     }
 
-    //return to current cluster
-    if ((lseek(fd, findCluster(currentCluster), SEEK_SET)) == -1){
-        printf("Cannot seek fat32.img\n");
+
+    //Update file offset
+    //just needs to be offest + size
+    for(int x = 0; x < 100; x++)
+    {
+        if(strcmp(filename, op[x].filename) == 0)
+        {
+            op[x].offset_position = (filePosOffset - findCluster(fileCluster)) + bytesToWrite;
+            break;
+        }
     }
+
 
     findFatSequence(fd, currentCluster);
     getDir(fd, currentCluster);
@@ -2005,8 +1991,6 @@ void myCpyFunc(int fd, int srcfileCluster, char * from, char * to, int index_fil
         buf = (unsigned int) newFatSeq[i + 1];
 
         write(fd, &buf,4);
-
-
     }
 
     //write to data region
