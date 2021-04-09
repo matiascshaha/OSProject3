@@ -5,11 +5,11 @@
 
 Division of Labor: 
 
-        Kyle Wise: info,size,ls,cd, mkdir,read, open, cp, rm 
+        Kyle Wise: info,size,ls,cd, mkdir,read, open, cp, rm, mv 
 
-        Matias Perichon: Creat Function,size, read, lseek, cp
+        Matias Perichon: Creat Function,size, read, lseek, cp, info
 
-        Andres Gonzalez:size, ls, cd, write, close, cp, rm
+        Andres Gonzalez:size, ls, cd, write, close, cp, rm, mv
         
         ***** we worked on a lot of the code together as a group through discord screen share *****
         
