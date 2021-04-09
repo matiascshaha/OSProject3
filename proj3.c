@@ -32,7 +32,7 @@ void remDir(int desc, unsigned int cluster, int off, int current);
 int checkAttr(char* from, char* to); //checks to see if mv args are legal
 void moveEntry(int desc, int index, int moveToCluster);
 void remEntry(int desc, int off, int current);
-void myCpyFunc(int fd, int srcfileCluster, char * from, char * to, int index_file);
+void myCpyFunc(int fd, int srcfileCluster, char * from, char * to, int index_file, int location);
 void myReadFunc(int fd, int filePosOffset,int bytesToRead, int fileCluster,
                 int file_size,int read_to_end,char *filename);
 void myWriteFunc(int fd, int offset, int bytesToWrite, int fileCluster,
@@ -70,6 +70,7 @@ struct openTable{
     unsigned int offset_position;
 };
 
+unsigned int totalSpace;
 struct openTable op[100];
 struct DIRENTRY dir[16];
 struct DIRENTRY redDir[208];
@@ -99,6 +100,7 @@ int main(int argc, char **argv)
     cdTrack = 1;
     redTrack = 0;
     openCheck = 0;
+	totalSpace = 0;
     int fd;
     int nextCluster;
 
@@ -161,16 +163,20 @@ int main(int argc, char **argv)
         else if(strcmp(tokens->items[0], "ls") == 0)
         {
             int check;
-            int d;
+            int d = 0;
             tokenlist *tok;
             if(tokens->size == 1 || strcmp(tokens->items[1], ".") == 0)
                 listDir(fd, currentCluster);
+			else if(strcmp(tokens->items[1], "..") == 0){
+				listDir(fd, cdClust[cdTrack]);
+			}
             else{
                 for(int i = 0; i < dirTrack; i++){
                     tok = get_tokens(dir[i].DIRName);
                     if(((check = strcmp(tokens->items[1], tok->items[0])) == 0)
                        && (dir[i].DIRAttr != 0x20)){
                         listDir(fd, dir[i].lowCluster);
+						d = 0;
                         break;
                     }
                     else if((strcmp(tokens->items[1], tok->items[0]) == 0)
@@ -572,11 +578,14 @@ int main(int argc, char **argv)
                                     isOpen = 1;
                                     break;
                                 }
-
-                                isOpen = 0;
-
+								
+								isOpen = 0;
+								if(op[x].offset_position >= dir[i].DIRSize){
+									printf("ERROR: %s is greater than the file size.\n", tokens->items[2]);
+									break;
+								}
                                 //if offset + SIZE is grater than fileSize
-                                if((atoi(tokens->items[2]) + op[x].offset_position) > dir[i].DIRSize)
+                                else if((atoi(tokens->items[2]) + op[x].offset_position) > dir[i].DIRSize)
                                 {
                                     //call read function here and read to end
                                     myReadFunc(fd,(findCluster(dir[i].lowCluster) + op[x].offset_position),
@@ -585,7 +594,7 @@ int main(int argc, char **argv)
 
                                 }
                                 else
-                                {//printf("%d\n", dir[i].lowCluster);
+                                {
                                     //call read function here and read the number of bytes given
                                     myReadFunc(fd,(findCluster(dir[i].lowCluster) + op[x].offset_position),
                                                atoi(tokens->items[2]),dir[i].lowCluster,
@@ -739,6 +748,7 @@ int main(int argc, char **argv)
                 int d;
                 int temp = 0;
                 int offset = 0;
+				int size = 0;
                 //check if file already exists
                 tokenlist *tok;
                 for(int i = 0; i < dirTrack; i++)
@@ -748,9 +758,10 @@ int main(int argc, char **argv)
                     if((strcmp(tokens->items[1], tok->items[0]) == 0)
                        && (dir[i].DIRAttr != 0x10))
                     {
+						size = dir[i].DIRSize;
                         remDir(fd, dir[i].lowCluster, i, currentCluster);
                         temp = 1;
-                        printf("%s removed: %d bytes freed.\n", tokens->items[1], dir[i].DIRSize);
+                        printf("%s removed. %d bytes freed\n", tokens->items[1], size);
                         break;
                     }
                     else if((strcmp(tokens->items[1], tok->items[0]) == 0)
@@ -772,6 +783,7 @@ int main(int argc, char **argv)
         {
             int temp = 0;
             int error = 0;
+			int index = 0;
             if(tokens->size < 3)
             {
                 printf("ERROR: wrong number of args\n");
@@ -785,7 +797,6 @@ int main(int argc, char **argv)
             for(int i = 0; i < dirTrack;i++)
             {
                 tok = get_tokens(dir[i].DIRName);
-                printf("%s\n", tok->items[0]);
                 if(strcmp(tok->items[0],tokens->items[1]) == 0)
                 {
                     //if from argument is a directory -> error
@@ -797,6 +808,7 @@ int main(int argc, char **argv)
                     {
                         //valid case
                         source_file_cluster = dir[i].lowCluster;
+						index = i;
                         error = 0;
                         break;
                     }
@@ -806,7 +818,6 @@ int main(int argc, char **argv)
             if(error == 0){
 
                 int exist = 0;
-                int index = 0;
                 for(int i = 0; i < dirTrack;i++)
                 {
                     tok = get_tokens(dir[i].DIRName);
@@ -822,15 +833,14 @@ int main(int argc, char **argv)
                         else if(dir[i].DIRAttr == 0x10)
                         {
                             //call cpy func here
-                            myCpyFunc(fd,source_file_cluster, tokens->items[1],tokens->items[2],i);
+                            myCpyFunc(fd,source_file_cluster, tokens->items[1],tokens->items[2],i, index);
                             break;
                         }
-
                     }
                 }
                 if(exist != 1)
                     myCpyFunc(fd,source_file_cluster, tokens->items[1],
-                              tokens->items[2],-1);
+                              tokens->items[2],-1, index);
             }
             else
                 printf("ERROR: %s doesn't exist.\n", tokens->items[1]);
@@ -855,7 +865,7 @@ int main(int argc, char **argv)
 void myReadFunc(int fd, int filePosOffset,int bytesToRead, int fileCluster,
                 int file_size,int read_to_end,char *filename)
 {
-
+	
     findFatSequence(fd, fileCluster);
     unsigned char buffer[bytesToRead];
     int fileByteTracker = filePosOffset;
@@ -890,7 +900,6 @@ void myReadFunc(int fd, int filePosOffset,int bytesToRead, int fileCluster,
             if (!(read(fd, buf3, ( whereToReadUpto - byteTrackerFile)) ==
                   (whereToReadUpto - byteTrackerFile))) {
                 printf("ERROR: cannot read\n");
-                exit(0);
             }
             fileByteTracker += sizeOfReadBuff;
             printf("%s\n", buf3);
@@ -943,7 +952,6 @@ void myReadFunc(int fd, int filePosOffset,int bytesToRead, int fileCluster,
         if(!(read(fd,&buffer, bytesToRead) == bytesToRead))
         {
             printf("ERROR: cannot read\n");
-            exit(0);
         }
         printf("%s\n", buffer);
     }
@@ -1132,6 +1140,7 @@ void remDir(int desc, unsigned int cluster, int off, int current){
             printf("ERROR: cannot write %s\n", fileName);
             exit(0);
         }
+		totalSpace += 512;
     }
     currentCluster = current;
     //location of direntry in current cluster
@@ -1210,13 +1219,11 @@ void createFile(int fd,int cluster,char *filename)
             if(cluster > 2)
             {
                 lastCluster = ((offset_track - 4) - 16384)/4;
-                printf("last cluster offset: %d\n",16384 + (lastCluster * 4));
 
             }
             else
             {
                 lastCluster = (offset_track - 16384)/4;
-                printf("last cluster offset: %d\n",16384 + (lastCluster * 4));
             }
 
             memset(buff,0,4);
@@ -1240,29 +1247,19 @@ void createFile(int fd,int cluster,char *filename)
                 {
                     emptyCluster_offset = offset_track;
                     emptyCluster = (emptyCluster_offset - 16384) / 4;
-                    printf("emptyCluster offset: %d\n",emptyCluster_offset);
                     break;
                 }
 
                 memset(buff,0,4);   //flush buffer
                 numCluster++;
             }
-
-            printf("empty cluster offset in data: %d\n",findCluster(emptyCluster));
-            printf("Number of clusters: %d\n", numCluster);
-            printf("Empty cluster: %d\n", emptyCluster);
-
-            int totalSpace = (bpb.FATsize*bpb.BytesPerSec) - ((numCluster+1) * 4);
-            printf("Total space in FAT: %d\n", totalSpace);
+			if(totalSpace == 0)
+				totalSpace = (bpb.FATsize*bpb.BytesPerSec) - ((numCluster+1) * 4);
 
             //add new entry to fat array = cluster number of new entry in fat
             fat[fatTrack] = emptyCluster;
             fatTrack++;
-            for(int i = 0; i < fatTrack;i++)
-            {
-                printf("fat entry: %d\n",fat[i]);
-            }
-            printf("last entry of fat array just added: %d\n",(emptyCluster_offset - 16384) / 4);
+
             //go to empty cluster offset
             if ((lseek(fd, emptyCluster_offset, SEEK_SET)) == -1) {
                 printf("Cannot seek fat32.img\n");
@@ -1355,13 +1352,11 @@ void makeDir(int fd,int cluster,char *filename)
             if(cluster > 2)
             {
                 lastCluster = ((offset_track - 4) - 16384)/4;
-                printf("last cluster offset: %d\n",16384 + (lastCluster * 4));
 
             }
             else
             {
                 lastCluster = (offset_track - 16384)/4;
-                printf("last cluster offset: %d\n",16384 + (lastCluster * 4));
             }
 
             memset(buff,0,4);
@@ -1385,29 +1380,19 @@ void makeDir(int fd,int cluster,char *filename)
                 {
                     emptyCluster_offset = offset_track;
                     emptyCluster = (emptyCluster_offset - 16384) / 4;
-                    printf("emptyCluster offset: %d\n",emptyCluster_offset);
                     break;
                 }
 
                 memset(buff,0,4);   //flush buffer
                 numCluster++;
             }
-
-            printf("empty cluster offset in data: %d\n",findCluster(emptyCluster));
-            printf("Number of clusters: %d\n", numCluster);
-            printf("Empty cluster: %d\n", emptyCluster);
-
-            int totalSpace = (bpb.FATsize*bpb.BytesPerSec) - ((numCluster+1) * 4);
-            printf("Total space in FAT: %d\n", totalSpace);
+			if(totalSpace == 0)
+				totalSpace = (bpb.FATsize*bpb.BytesPerSec) - ((numCluster+1) * 4);
 
             //add new entry to fat array = cluster number of new entry in fat
             fat[fatTrack] = emptyCluster;
             fatTrack++;
-            for(int i = 0; i < fatTrack;i++)
-            {
-                printf("fat entry: %d\n",fat[i]);
-            }
-            printf("last entry of fat array just added: %d\n",(emptyCluster_offset - 16384) / 4);
+
 
             //go to empty cluster offset
             if ((lseek(fd, emptyCluster_offset, SEEK_SET)) == -1) {
@@ -1713,7 +1698,7 @@ void findFatSequence(int fd, int cluster)
 //ls the current directory
 void listDir(int desc, int cluster)
 {
-    if(cluster > currentCluster){
+    if(cluster > currentCluster || cluster < currentCluster){
         int offset;
         findFatSequence(desc,cluster);
         for(int i = 0; i < fatTrack; i++)
@@ -1822,14 +1807,19 @@ void myWriteFunc(int fd, int offset, int bytesToWrite, int fileCluster,
     unsigned int buf;
 
     //if STRING is larger than SIZE, pass only first SIZE bytes
-    char newstr[bytesToWrite];
+    unsigned char newstr[bytesToWrite];
     if(strlen(string) >= bytesToWrite)
         strncpy(newstr, string, bytesToWrite);
 
         //just give it the same str, newstr is 'BytesToWrite' size
         //so str will only take up as much as needed followed by 0's
-    else
+    else{
         strcpy(newstr, string);
+		//zero padding
+		for(int i = strlen(string); i < bytesToWrite; i++){
+			newstr[i] = (unsigned char) 0x0;
+		}
+	}
 
     //need to extend the length of the file
     if(fileExtend)
@@ -1862,7 +1852,6 @@ void myWriteFunc(int fd, int offset, int bytesToWrite, int fileCluster,
                 if(buf == 0)
                 {
                     clusterNum = track/4;
-                    printf("Cluster num: %X\n", clusterNum);
 
                     trackFAT++;
                     break;
@@ -1881,7 +1870,11 @@ void myWriteFunc(int fd, int offset, int bytesToWrite, int fileCluster,
         }
 
         int totalBytes = bytesToWrite;
-        int bytesRemaining = findCluster(fileCluster+1) - filePosOffset;
+		int bytesRemaining = 0;
+		if(bytesToWrite > findCluster(fat[fatTrack - 1]) - filePosOffset)
+			bytesRemaining = findCluster(fat[fatTrack - 1]) - filePosOffset;
+		else
+			bytesRemaining = bytesToWrite;
 
         //go back to the start of the file
         lseek(fd, filePosOffset, SEEK_SET);
@@ -1896,33 +1889,48 @@ void myWriteFunc(int fd, int offset, int bytesToWrite, int fileCluster,
 
             write(fd, &buffer, bytesRemaining);
             totalBytes -= bytesRemaining;
-            //
+            
             lseek(fd, findCluster(fat[fatTrack - trackFAT + 1]), SEEK_SET);
             if(totalBytes > 512)
                 bytesRemaining = 512;
             else
                 bytesRemaining = totalBytes;
-            printf("Bytes remaining: %d\n", bytesRemaining);
-        }
+		}
 
         //update file size
-        printf("Total Bytes:%d\n", totalBytes);
         tokenlist *tok;
+		int temp = 0;
         for(int i = 0; i < dirTrack; i++)
         {
             tok = get_tokens(dir[i].DIRName);
             if(strcmp(filename, tok->items[0]) == 0)
             {
-                dir[i].DIRSize += extraClusters*512;
+				temp = i;
+				dir[i].DIRSize += extraClusters*512;
                 printf("New file size:%d\n", dir[i].DIRSize);
             }
         }
+		lseek(fd, (findCluster(currentCluster) + (32*temp)), SEEK_SET);
+		uint32_t size = dir[temp].DIRSize;
+		write(fd, &dir[temp], 32);
     }
 
     else //no clusters need to be allocated
     {
         lseek(fd, filePosOffset, SEEK_SET);
         write(fd, &newstr, bytesToWrite);
+		
+		//update file size
+		tokenlist *tok;
+        for(int i = 0; i < dirTrack; i++)
+        {
+            tok = get_tokens(dir[i].DIRName);
+            if(strcmp(filename, tok->items[0]) == 0)
+            {
+				dir[i].DIRSize += bytesToWrite;
+                printf("New file size:%d\n", dir[i].DIRSize);
+            }
+        }
     }
 
 
@@ -1942,8 +1950,10 @@ void myWriteFunc(int fd, int offset, int bytesToWrite, int fileCluster,
     getDir(fd, currentCluster);
 }
 
-void myCpyFunc(int fd, int srcfileCluster, char * from, char * to, int index_file)
+void myCpyFunc(int fd, int srcfileCluster, char * from, char * to, int index_file, int location)
 {
+	struct DIRENTRY dir_to_be_added;
+	dir_to_be_added.DIRSize = dir[location].DIRSize;
     //grab fat for file
     findFatSequence(fd, srcfileCluster);
     int track = 0;
@@ -1954,7 +1964,7 @@ void myCpyFunc(int fd, int srcfileCluster, char * from, char * to, int index_fil
     int newFatSeqTrack = fatTrack;
     int clusterNum = 0;
     int trackFAT = 0;
-    printf("Fat track: %d\n", fatTrack);
+
     for(int i = 0; i < fatTrack; i++)
     {
         while(1)
@@ -1967,7 +1977,6 @@ void myCpyFunc(int fd, int srcfileCluster, char * from, char * to, int index_fil
             if(buf == 0)
             {
                 clusterNum = track/4;
-                printf("Cluster num: %X\n", clusterNum);
 
                 trackFAT++;
                 break;
@@ -1994,7 +2003,7 @@ void myCpyFunc(int fd, int srcfileCluster, char * from, char * to, int index_fil
     }
 
     //write to data region
-    struct DIRENTRY dir_to_be_added;
+    
     dir_to_be_added.lowCluster = newFatSeq[0];
     if(index_file != -1)
         strcpy(dir_to_be_added.DIRName,from);
@@ -2033,7 +2042,6 @@ void myCpyFunc(int fd, int srcfileCluster, char * from, char * to, int index_fil
     if(index_file != -1)
     {
         lseek(fd, (findCluster(srcfileCluster)+(32*temp)), SEEK_SET);
-        printf("offset location: %d\n",findCluster(srcfileCluster));
         write(fd,&dir_to_be_added, 32);
     }
     else
