@@ -25,6 +25,9 @@ Tar File:
 
 Bugs: 
 
-    'ls ..' still lists current directory content despite being passed previous cluster value.
+        N/A
     
 Special Considerations: 
+
+        whenever you read or write the offset position of the file is changed, so if you want to read the beginning of a file after you have to make sure to lseek FILENAME 0 to go back to the beginning position.
+
