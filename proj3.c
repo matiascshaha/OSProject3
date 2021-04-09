@@ -71,6 +71,7 @@ struct openTable{
 };
 
 unsigned int totalSpace;
+int globalClust;
 struct openTable op[100];
 struct DIRENTRY dir[16];
 struct DIRENTRY redDir[208];
@@ -100,7 +101,6 @@ int main(int argc, char **argv)
     cdTrack = 1;
     redTrack = 0;
     openCheck = 0;
-	totalSpace = 0;
     int fd;
     int nextCluster;
 
@@ -124,7 +124,9 @@ int main(int argc, char **argv)
     getInfo(fd);	//populates BPB struct
 
     //set initial root cluster into array
-    findFatSequence(fd,bpb.rootCuster);
+    findNumClust(fd, bpb.rootCuster);
+	totalSpace = (bpb.FATsize*bpb.BytesPerSec) - (globalClust * 4);
+	findFatSequence(fd,bpb.rootCuster);
     currentCluster = 2;
     getDir(fd, bpb.rootCuster);
 
@@ -997,6 +999,31 @@ void myReadFunc(int fd, int filePosOffset,int bytesToRead, int fileCluster,
             }
         }
     }
+}
+
+void findNumClust(int fd, int root){
+	int offset_track = 0;
+	int nextCluster;
+	int numCluster = 0;
+	unsigned char buff[4];
+	lseek(fd, 16384 + (root * 4), SEEK_SET);	
+	while(nextCluster != 0)
+	{
+		//read next immediate block
+		read(fd, buff, 4);
+
+		nextCluster=0;
+		for(int i = 0; i < 4; i++){
+			nextCluster += (unsigned int) buff[i];
+		}
+
+		if(nextCluster == 0)
+		{
+			break;
+		}
+		memset(buff,0,4);   //flush buffer
+		globalClust++;
+	}
 }
 
 //moves file or directory to provided directory
@@ -1900,6 +1927,7 @@ void myWriteFunc(int fd, int offset, int bytesToWrite, int fileCluster,
         //update file size
         tokenlist *tok;
 		int temp = 0;
+		int prevSize = 0;
         for(int i = 0; i < dirTrack; i++)
         {
             tok = get_tokens(dir[i].DIRName);
@@ -1907,12 +1935,15 @@ void myWriteFunc(int fd, int offset, int bytesToWrite, int fileCluster,
             {
 				temp = i;
 				dir[i].DIRSize += extraClusters*512;
-                printf("New file size:%d\n", dir[i].DIRSize);
+                //printf("New file size:%d\n", dir[i].DIRSize);
             }
         }
+		prevSize = dir[temp].DIRSize;
 		lseek(fd, (findCluster(currentCluster) + (32*temp)), SEEK_SET);
 		uint32_t size = dir[temp].DIRSize;
 		write(fd, &dir[temp], 32);
+		totalSpace -= bytesToWrite;
+		printf("Used Space: %d\nTotal Space Available: %d\n", dir[temp].DIRSize, totalSpace);
     }
 
     else //no clusters need to be allocated
@@ -1922,16 +1953,24 @@ void myWriteFunc(int fd, int offset, int bytesToWrite, int fileCluster,
 		
 		//update file size
 		tokenlist *tok;
+		int temp = 0;
         for(int i = 0; i < dirTrack; i++)
         {
             tok = get_tokens(dir[i].DIRName);
             if(strcmp(filename, tok->items[0]) == 0)
             {
+				temp = i;
 				dir[i].DIRSize += bytesToWrite;
-                printf("New file size:%d\n", dir[i].DIRSize);
+                //printf("New file size:%d\n", dir[i].DIRSize);
             }
         }
+		lseek(fd, (findCluster(currentCluster) + (32*temp)), SEEK_SET);
+		uint32_t size = dir[temp].DIRSize;
+		write(fd, &dir[temp], 32);
+		totalSpace -= bytesToWrite;
+		printf("Used Space: %d\nTotal Space Available: %d\n", dir[temp].DIRSize, totalSpace);
     }
+
 
 
     //Update file offset
