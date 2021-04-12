@@ -116,6 +116,7 @@ char fileName[32];
 int cdClust[100];
 int cdTrack;
 int redFlip;
+char str[100]; //hold our string argument for write
 
 int main(int argc, char **argv)
 {
@@ -164,6 +165,10 @@ int main(int argc, char **argv)
         printf("$ ");
         char *input = get_input();
         tokenlist *tokens = get_tokens(input);
+        //for the string argument in write
+        //take the substring and strip quotes
+        if(tokens->size > 4)
+            sscanf(input, "%*[^\"]%*c%[^\"]", str);
 
         if(strcmp(tokens->items[0], "exit") == 0)
             break;
@@ -174,18 +179,34 @@ int main(int argc, char **argv)
         else if(strcmp(tokens->items[0], "size") == 0)
         {
             int check;
-            tokenlist *tok;
-            for(int i = 0; i < dirTrack; i++){
-                tok = get_tokens(dir[i].DIRName);
-                if((check = strcmp(uppercase(tokens->items[1]), tok->items[0])) == 0){
-                    check = 0;
-                    printf("%d bytes\n", dir[i].DIRSize);
-                    break;
+            if(redFlip != 1)
+            {
+                tokenlist *tok;
+                for(int i = 0; i < dirTrack; i++){
+                    tok = get_tokens(dir[i].DIRName);
+                    if((check = strcmp(uppercase(tokens->items[1]), tok->items[0])) == 0){
+                        check = 0;
+                        printf("%d bytes\n", dir[i].DIRSize);
+                        break;
+                    }
                 }
+                if(check != 0)
+                    printf("ERROR: %s does not exist.\n", tokens->items[1]);
             }
-            if(check != 0)
-                printf("ERROR: %s does not exist.\n", tokens->items[1]);
-
+            else
+            {
+                tokenlist *tok;
+                for(int i = 0; i < redTrack; i++){
+                    tok = get_tokens(redDir[i].DIRName);
+                    if((check = strcmp(uppercase(tokens->items[1]), tok->items[0])) == 0){
+                        check = 0;
+                        printf("%d bytes\n", dir[i].DIRSize);
+                        break;
+                    }
+                }
+                if(check != 0)
+                    printf("ERROR: %s does not exist.\n", tokens->items[1]);
+            }
         }
 
         else if(strcmp(tokens->items[0], "ls") == 0)
@@ -581,54 +602,109 @@ int main(int argc, char **argv)
                 printf("ERROR: Unable to lseek (null).\n");
             else
             {
-                for(int i = 0; i < dirTrack; i++)
+                if(redFlip != 1)
                 {
-                    tok = get_tokens(dir[i].DIRName);
-                    //check if file exists in current directory
-                    if(strcmp(uppercase(tokens->items[1]), tok->items[0]) == 0)
+                    for(int i = 0; i < dirTrack; i++)
                     {
-                        exist = 0;
-                        //check if it is a directory
-                        if(dir[i].DIRAttr == 0x10)
+                        tok = get_tokens(dir[i].DIRName);
+                        //check if file exists in current directory
+                        if(strcmp(uppercase(tokens->items[1]), tok->items[0]) == 0)
                         {
-                            printf("ERROR: %s is a directory\n", tokens->items[1]);
-                            break;
-                        }
-                        for(int x = 0; x < 100; x++)
-                        {
-                            //check if file is in open table
-                            if(strcmp(uppercase(tokens->items[1]), op[x].filename) == 0)
+                            exist = 0;
+                            //check if it is a directory
+                            if(dir[i].DIRAttr == 0x10)
                             {
-                                isOpen = 0;
-                                //check to see if offset argument is greater than file size
-                                if((atoi(tokens->items[2]) < 0))
-                                {
-                                    printf("ERROR: offset %d is less than 0\n",tokens->items[2]);
-                                }
-                                else if(atoi(tokens->items[2]) > dir[i].DIRSize)
-                                {
-
-                                    printf("ERROR: offset %s is bigger than file size for ( %s ) \n",
-                                           tokens->items[2], tokens->items[1]);
-                                }
-                                else
-                                {
-                                    //change offset position of open file
-                                    op[x].offset_position = atoi(tokens->items[2]);
-                                }
+                                printf("ERROR: %s is a directory\n", tokens->items[1]);
                                 break;
                             }
+                            for(int x = 0; x < 100; x++)
+                            {
+                                //check if file is in open table
+                                if(strcmp(uppercase(tokens->items[1]), op[x].filename) == 0)
+                                {
+                                    isOpen = 0;
+                                    //check to see if offset argument is greater than file size
+                                    if((atoi(tokens->items[2]) < 0))
+                                    {
+                                        printf("ERROR: offset %d is less than 0\n",tokens->items[2]);
+                                    }
+                                    else if(atoi(tokens->items[2]) > dir[i].DIRSize)
+                                    {
+
+                                        printf("ERROR: offset %s is bigger than file size for ( %s ) \n",
+                                               tokens->items[2], tokens->items[1]);
+                                    }
+                                    else
+                                    {
+                                        //change offset position of open file
+                                        op[x].offset_position = atoi(tokens->items[2]);
+                                    }
+                                    break;
+                                }
+                            }
+
+                            if(isOpen != 0)
+                                printf("ERROR: file %s is not open to lseek\n",tokens->items[1]);
+
+                            break;
                         }
-
-                        if(isOpen != 0)
-                            printf("ERROR: file %s is not open to lseek\n",tokens->items[1]);
-
-                        break;
                     }
-                }
 
-                if(exist != 0)
-                    printf("ERROR: file %s doesn't exist\n",tokens->items[1]);
+                    if(exist != 0)
+                        printf("ERROR: file %s doesn't exist\n",tokens->items[1]);
+                }
+                else
+                {
+                    for(int i = 0; i < redTrack; i++)
+                    {
+                        tok = get_tokens(redDir[i].DIRName);
+                        //check if file exists in current directory
+                        if(strcmp(uppercase(tokens->items[1]), tok->items[0]) == 0)
+                        {
+                            exist = 0;
+                            //check if it is a directory
+                            if(dir[i].DIRAttr == 0x10)
+                            {
+                                printf("ERROR: %s is a directory\n", tokens->items[1]);
+                                break;
+                            }
+                            for(int x = 0; x < 100; x++)
+                            {
+                                //check if file is in open table
+                                if(strcmp(uppercase(tokens->items[1]), op[x].filename) == 0)
+                                {
+                                    isOpen = 0;
+                                    //check to see if offset argument is greater than file size
+                                    if((atoi(tokens->items[2]) < 0))
+                                    {
+                                        printf("ERROR: offset %d is less than 0\n",tokens->items[2]);
+                                    }
+                                    else if(atoi(tokens->items[2]) > dir[i].DIRSize)
+                                    {
+
+                                        printf("ERROR: offset %s is bigger than file size for ( %s ) \n",
+                                               tokens->items[2], tokens->items[1]);
+                                    }
+                                    else
+                                    {
+                                        //change offset position of open file
+                                        op[x].offset_position = atoi(tokens->items[2]);
+                                    }
+                                    break;
+                                }
+                            }
+
+                            if(isOpen != 0)
+                                printf("ERROR: file %s is not open to lseek\n",tokens->items[1]);
+
+                            break;
+                        }
+                    }
+
+                    if(exist != 0)
+                        printf("ERROR: file %s doesn't exist\n",tokens->items[1]);
+
+                }
             }
         }
 
@@ -703,11 +779,12 @@ int main(int argc, char **argv)
 					if(exist != 0)
 						printf("ERROR: file %s doesn't exist\n", tokens->items[1]);
 				}
-				else{
+				else
+                {
 					for(int i = 0; i < redTrack; i++)
 					{
 						tok = get_tokens(redDir[i].DIRName);
-						printf("%s\n",redDir[i].DIRName);
+						//printf("%s\n",redDir[i].DIRName);
 						//check if file exists in current directory
 						if(strcmp(uppercase(tokens->items[1]), tok->items[0]) == 0)
 						{
@@ -743,7 +820,6 @@ int main(int argc, char **argv)
 										myReadFunc(fd,(findCluster(redDir[i].lowCluster) + op[x].offset_position),
 												   (atoi(tokens->items[2]) - redDir[i].DIRSize), redDir[i].lowCluster,
 												   redDir[i].DIRSize, 1, uppercase(tokens->items[1]));
-
 									}
 									else
 									{
@@ -780,13 +856,9 @@ int main(int argc, char **argv)
             unsigned int filesize;
             unsigned int fileOffset;
             unsigned int offsetPos;
-            //check for correct number of args
-            if(tokens->size != 4)
+            
+			if(redFlip != 1)
             {
-                printf("ERROR: wrong number of arguments\n");
-                continue;
-            }
-			if(redFlip != 1){
 				//check to see if file exist
 				for(int i = 0; i < dirTrack; i++)
 				{
@@ -809,7 +881,8 @@ int main(int argc, char **argv)
 					}
 				}
 			}
-			else{
+			else
+            {
 				//check to see if file exist
 				for(int i = 0; i < redTrack; i++)
 				{
@@ -880,13 +953,6 @@ int main(int argc, char **argv)
                 unsigned int bytes = atoi(tokens->items[2]);
                 //offset in the data region
                 unsigned int filePosOffset = findCluster(fileCluster) + offsetPos;
-                //strip quotes from filename
-                char string[strlen(tokens->items[3])];
-                strcpy(string, tokens->items[3]);
-                char *str = string;
-                str++;
-                str[strlen(str) - 1] = 0;
-
                 //if offset + size is larger than file, need to extend file length
                 unsigned int offset = offsetPos + bytes;
 
