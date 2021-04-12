@@ -115,6 +115,7 @@ struct BPB bpb;
 char fileName[32];
 int cdClust[100];
 int cdTrack;
+int redFlip;
 
 int main(int argc, char **argv)
 {
@@ -230,8 +231,7 @@ int main(int argc, char **argv)
         {
             int check;
             char * red;
-            int redFlip;
-            red = tokens->items[1];
+            red = uppercase(tokens->items[1]);
             tokenlist *tok;
             if(strcmp(tokens->items[1], "..") == 0)
             {
@@ -283,7 +283,7 @@ int main(int argc, char **argv)
                         currentCluster = dir[i].lowCluster;
                         //if RED or GREEN then true
                         if((strcmp(uppercase(tokens->items[1]), "RED") == 0)
-                           || (strcmp(tokens->items[1], "GREEN") == 0))
+                           || (strcmp(uppercase(tokens->items[1]), "GREEN") == 0))
                             redFlip = 1;
 
                         break;
@@ -482,37 +482,67 @@ int main(int argc, char **argv)
                 //checks if file is already open
                 for(int j = 0; j < 100; j++){
                     if(strcmp(uppercase(tokens->items[1]), op[j].filename) == 0){
-                        printf("ERROR: %s is already open.\n", tokens->items[0]);
+                        printf("ERROR: %s is already open.\n", tokens->items[1]);
                         isOpen = 1;
+						exist = 1;
                         break;
                     }
                 }
-                //parses directory entries for opening
-                for(int i = 0; i < dirTrack; i++)
-                {
-                    tok = get_tokens(dir[i].DIRName);
+				if(redFlip != 1){
+					//parses directory entries for opening
+					for(int i = 0; i < dirTrack; i++)
+					{
+						tok = get_tokens(dir[i].DIRName);
 
-                    if((strcmp(uppercase(tokens->items[1]), tok->items[0]) == 0) && (isOpen == 0))
-                    {
-                        exist = 1;
-                        openCheck++; //tracks total number of files open
-                        //adds new file to the open table at first empty space in array
-                        for(int j = 0; j < 100; j++)
-                        {
-                            if(op[j].filename[0] == '\0'){
-                                op[j].startCluster = dir[i].lowCluster;
-                                op[j].offset_position = 0;
-                                strcpy(op[j].filename, uppercase(tokens->items[1]));
-                                strcpy(op[j].mode, tokens->items[2]);
-                                break;
-                            }
-                        }
-                        break;
-                    }
-                }
-                if(exist != 1)
-                    printf("ERROR: %s does not exist.\n", tok->items[1]);
-            }
+						if((strcmp(uppercase(tokens->items[1]), tok->items[0]) == 0) && (isOpen == 0))
+						{
+							exist = 1;
+							openCheck++; //tracks total number of files open
+							//adds new file to the open table at first empty space in array
+							for(int j = 0; j < 100; j++)
+							{
+								if(op[j].filename[0] == '\0'){
+									op[j].startCluster = dir[i].lowCluster;
+									op[j].offset_position = 0;
+									strcpy(op[j].filename, uppercase(tokens->items[1]));
+									strcpy(op[j].mode, tokens->items[2]);
+									break;
+								}
+							}
+							break;
+						}
+					}
+					if(exist != 1)
+						printf("ERROR: %s does not exist.\n", tokens->items[1]);
+				}
+				else{
+					//parses directory entries for opening
+					for(int i = 0; i < redTrack; i++)
+					{
+						tok = get_tokens(redDir[i].DIRName);
+						if((strcmp(uppercase(tokens->items[1]), tok->items[0]) == 0) && (isOpen == 0))
+						{
+							exist = 1;
+							openCheck++; //tracks total number of files open
+							//adds new file to the open table at first empty space in array
+							for(int j = 0; j < 100; j++)
+							{
+								if(op[j].filename[0] == '\0'){
+									op[j].startCluster = dir[i].lowCluster;
+									op[j].offset_position = 0;
+									strcpy(op[j].filename, uppercase(tokens->items[1]));
+									strcpy(op[j].mode, tokens->items[2]);
+									break;
+								}
+							}
+							break;
+						}
+					}
+					if(exist != 1)
+						printf("ERROR: %s does not exist.\n", tok->items[0]);
+					
+				}
+			}
         }
 
         else if(strcmp(tokens->items[0], "close") == 0)
@@ -1492,7 +1522,7 @@ void makeDir(int fd,int cluster,char *filename)
                 printf("Cannot seek fat32.img\n");
             
             struct DIRENTRY dir_to_be_added;
-            strcpy(dir_to_be_added.DIRName,filename);
+            strcpy(dir_to_be_added.DIRName,uppercase(filename));
             dir_to_be_added.DIRAttr = 0x10;
             dir_to_be_added.DIRSize = 0;
             dir_to_be_added.lowCluster = emptyCluster;
