@@ -832,7 +832,7 @@ int main(int argc, char **argv)
                 //if it doesn't exist
                 if(d == 1)
                     printf("ERROR: %s is a directory.\n", tokens->items[1]);
-                
+
                 else if(temp != 1)
                     printf("ERROR: %s doesn't exist.\n", tokens->items[1]);
             }
@@ -1380,7 +1380,8 @@ void createFile(int fd,int cluster,char *filename)
                 printf("Cannot seek fat32.img\n");
             
             //print out prompt
-            printf("%s created: %d bytes used, %d bytes remaining\n", filename, 4, (totalSpace -= 4));
+            printf("%s created: %d bytes used, %d bytes remaining\n", filename,
+                    dir_to_be_added.DIRSize, (totalSpace -= dir_to_be_added.DIRSize));
             break;
         }
     }
@@ -1986,7 +1987,7 @@ void myWriteFunc(int fd, int offset, int bytesToWrite, int fileCluster,
             if(strcmp(filename, tok->items[0]) == 0)
             {
 				temp = i;
-				dir[i].DIRSize += extraClusters*512;
+				dir[i].DIRSize += bytesToWrite;
                 //printf("New file size:%d\n", dir[i].DIRSize);
             }
         }
@@ -1995,7 +1996,7 @@ void myWriteFunc(int fd, int offset, int bytesToWrite, int fileCluster,
 		uint32_t size = dir[temp].DIRSize;
 		write(fd, &dir[temp], 32);
 		totalSpace -= bytesToWrite;
-		printf("Used Space: %d\nTotal Space Available: %d\n", dir[temp].DIRSize, totalSpace);
+		printf("Used Space: %d bytes. Total Space Available: %d bytes\n", dir[temp].DIRSize, totalSpace);
     }
 
     else //no clusters need to be allocated
@@ -2020,7 +2021,7 @@ void myWriteFunc(int fd, int offset, int bytesToWrite, int fileCluster,
 		uint32_t size = dir[temp].DIRSize;
 		write(fd, &dir[temp], 32);
 		totalSpace -= bytesToWrite;
-		printf("Used Space: %d\nTotal Space Available: %d\n", dir[temp].DIRSize, totalSpace);
+		printf("Used Space: %d bytes. Total Space Available: %d bytes\n", dir[temp].DIRSize, totalSpace);
     }
 
     //Update file offset
@@ -2056,7 +2057,6 @@ void myCpyFunc(int fd, int srcfileCluster, char * from, char * to, int index_fil
     {
         while(1)
         {
-            //printf("TEST\n");
             //seek to start of FAT
             lseek(fd, 16384+track, SEEK_SET);
             //read 4 bytes
