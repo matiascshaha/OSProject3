@@ -405,7 +405,7 @@ int main(int argc, char **argv)
             for(int i = 0; i < dirTrack; i++)
             {
                 tok = get_tokens(dir[i].DIRName);
-                if((strcmp(uppercase(tokens->items[1]), tok->items[0]) == 0)
+                if((strcmp(uppercase(tokens->items[2]), tok->items[0]) == 0)
                    && (dir[i].DIRAttr == 0x20))
                 {
                     printf("ERROR: %s already exist\n", tokens->items[2]);
@@ -430,7 +430,7 @@ int main(int argc, char **argv)
                         temp = i;
                         check1 = 1;
                     }
-                    else if(strcmp(uppercase(tokens->items[1]), tok->items[0]) == 0)
+                    else if(strcmp(uppercase(tokens->items[2]), tok->items[0]) == 0)
                     {
                         mvClust = dir[i].lowCluster;
                         check2 = 1;
@@ -440,7 +440,7 @@ int main(int argc, char **argv)
                     printf("ERROR: %s does not exist.\n", tokens->items[1]);
 
                 else if(check2 != 1){
-                    strncpy(dir[temp].DIRName, uppercase(tokens->items[1]), 11);
+                    strncpy(dir[temp].DIRName, uppercase(tokens->items[2]), 11);
 
                     if ((lseek(fd, (findCluster(currentCluster)+(32*temp)), SEEK_SET)) == -1)
                         printf("Cannot seek fat32.img\n");
@@ -643,64 +643,127 @@ int main(int argc, char **argv)
             }
             else
             {
-                for(int i = 0; i < dirTrack; i++)
-                {
-                    tok = get_tokens(dir[i].DIRName);
-                    //check if file exists in current directory
-                    if(strcmp(uppercase(tokens->items[1]), tok->items[0]) == 0)
-                    {
-                        exist = 0;
-                        //check if it is a directory
-                        if(dir[i].DIRAttr == 0x10)
-                        {
-                            printf("ERROR: %s is a directory\n", tokens->items[1]);
-                            break;
-                        }
-                        for(int x = 0; x < 100; x++)
-                        {
-                            //check if file is in open table
-                            if(strcmp(uppercase(tokens->items[1]), op[x].filename) == 0)
-                            {
-                                tok = get_tokens(op[x].mode);
-                                //check if file is opened in correct mode
-                                if(strcmp(tok->items[0], "r") != 0 && strcmp(tok->items[0], "wr") != 0
-                                   && strcmp(tok->items[0], "rw") != 0){
-                                    isOpen = 1;
-                                    break;
-                                }
-								
-								isOpen = 0;
-								if(op[x].offset_position >= dir[i].DIRSize){
-									printf("ERROR: %s is greater than the file size.\n", tokens->items[2]);
+				if(redFlip != 1){
+					for(int i = 0; i < dirTrack; i++)
+					{
+						tok = get_tokens(dir[i].DIRName);
+						//check if file exists in current directory
+						if(strcmp(uppercase(tokens->items[1]), tok->items[0]) == 0)
+						{
+							exist = 0;
+							//check if it is a directory
+							if(dir[i].DIRAttr == 0x10)
+							{
+								printf("ERROR: %s is a directory\n", tokens->items[1]);
+								break;
+							}
+							for(int x = 0; x < 100; x++)
+							{
+								//check if file is in open table
+								if(strcmp(uppercase(tokens->items[1]), op[x].filename) == 0)
+								{
+									tok = get_tokens(op[x].mode);
+									//check if file is opened in correct mode
+									if(strcmp(tok->items[0], "r") != 0 && strcmp(tok->items[0], "wr") != 0
+									   && strcmp(tok->items[0], "rw") != 0){
+										isOpen = 1;
+										break;
+									}
+									
+									isOpen = 0;
+									if(op[x].offset_position >= dir[i].DIRSize){
+										printf("ERROR: %s is greater than the file size.\n", tokens->items[2]);
+										break;
+									}
+									//if offset + SIZE is grater than fileSize
+									else if((atoi(tokens->items[2]) + op[x].offset_position) > dir[i].DIRSize)
+									{
+										//call read function here and read to end
+										myReadFunc(fd,(findCluster(dir[i].lowCluster) + op[x].offset_position),
+												   (atoi(tokens->items[2]) - dir[i].DIRSize), dir[i].lowCluster,
+												   dir[i].DIRSize, 1, uppercase(tokens->items[1]));
+
+									}
+									else
+									{
+										//call read function here and read the number of bytes given
+										myReadFunc(fd, (findCluster(dir[i].lowCluster) + op[x].offset_position),
+												   atoi(tokens->items[2]), dir[i].lowCluster,
+												   dir[i].DIRSize, 0, uppercase(tokens->items[1]));
+									}
 									break;
 								}
-                                //if offset + SIZE is grater than fileSize
-                                else if((atoi(tokens->items[2]) + op[x].offset_position) > dir[i].DIRSize)
-                                {
-                                    //call read function here and read to end
-                                    myReadFunc(fd,(findCluster(dir[i].lowCluster) + op[x].offset_position),
-                                               (atoi(tokens->items[2]) - dir[i].DIRSize), dir[i].lowCluster,
-                                               dir[i].DIRSize, 1, uppercase(tokens->items[1]));
+							}
+							if(isOpen != 0)
+								printf("ERROR: file %s is not open to read\n", tokens->items[1]);
 
-                                }
-                                else
-                                {
-                                    //call read function here and read the number of bytes given
-                                    myReadFunc(fd, (findCluster(dir[i].lowCluster) + op[x].offset_position),
-                                               atoi(tokens->items[2]), dir[i].lowCluster,
-                                               dir[i].DIRSize, 0, uppercase(tokens->items[1]));
-                                }
-                                break;
-                            }
-                        }
-                        if(isOpen != 0)
-                            printf("ERROR: file %s is not open to read\n", tokens->items[1]);
+							break;
+						}
+					}
+					if(exist != 0)
+						printf("ERROR: file %s doesn't exist\n", tokens->items[1]);
+				}
+				else{
+					for(int i = 0; i < redTrack; i++)
+					{
+						tok = get_tokens(redDir[i].DIRName);
+						printf("%s\n",redDir[i].DIRName);
+						//check if file exists in current directory
+						if(strcmp(uppercase(tokens->items[1]), tok->items[0]) == 0)
+						{
+							exist = 0;
+							//check if it is a directory
+							if(redDir[i].DIRAttr == 0x10)
+							{
+								printf("ERROR: %s is a directory\n", tokens->items[1]);
+								break;
+							}
+							for(int x = 0; x < 100; x++)
+							{
+								//check if file is in open table
+								if(strcmp(uppercase(tokens->items[1]), op[x].filename) == 0)
+								{
+									tok = get_tokens(op[x].mode);
+									//check if file is opened in correct mode
+									if(strcmp(tok->items[0], "r") != 0 && strcmp(tok->items[0], "wr") != 0
+									   && strcmp(tok->items[0], "rw") != 0){
+										isOpen = 1;
+										break;
+									}
+									
+									isOpen = 0;
+									if(op[x].offset_position >= redDir[i].DIRSize){
+										printf("ERROR: %s is greater than the file size.\n", tokens->items[2]);
+										break;
+									}
+									//if offset + SIZE is grater than fileSize
+									else if((atoi(tokens->items[2]) + op[x].offset_position) > redDir[i].DIRSize)
+									{
+										//call read function here and read to end
+										myReadFunc(fd,(findCluster(redDir[i].lowCluster) + op[x].offset_position),
+												   (atoi(tokens->items[2]) - redDir[i].DIRSize), redDir[i].lowCluster,
+												   redDir[i].DIRSize, 1, uppercase(tokens->items[1]));
 
-                        break;
-                    }
-                }
-                if(exist != 0)
-                    printf("ERROR: file %s doesn't exist\n", tokens->items[1]);
+									}
+									else
+									{
+										//call read function here and read the number of bytes given
+										myReadFunc(fd, (findCluster(dir[i].lowCluster) + op[x].offset_position),
+												   atoi(tokens->items[2]), redDir[i].lowCluster,
+												   redDir[i].DIRSize, 0, uppercase(tokens->items[1]));
+									}
+									break;
+								}
+							}
+							if(isOpen != 0)
+								printf("ERROR: file %s is not open to read\n", tokens->items[1]);
+
+							break;
+						}
+					}
+					if(exist != 0)
+						printf("ERROR: file %s doesn't exist\n", tokens->items[1]);
+				}
             }
         }
 
@@ -723,28 +786,52 @@ int main(int argc, char **argv)
                 printf("ERROR: wrong number of arguments\n");
                 continue;
             }
-
-            //check to see if file exist
-            for(int i = 0; i < dirTrack; i++)
-            {
-                tok = get_tokens(dir[i].DIRName);
-                if((strcmp(uppercase(tokens->items[1]), tok->items[0]) == 0)
-                   && (dir[i].DIRAttr == 0x20))
-                {
-                    exist = 1;
-                    filesize = dir[i].DIRSize;
-                    fileCluster = dir[i].lowCluster;
-                    break;
-                }
-                else if((strcmp(uppercase(tokens->items[1]), tok->items[0]) == 0)
-                        && (dir[i].DIRAttr == 0x10))
-                {
-                    printf("ERROR: %s is a Directory\n", tokens->items[1]);
-                    error = 1;
-                    isDir = 1;
-                    break;
-                }
-            }
+			if(redFlip != 1){
+				//check to see if file exist
+				for(int i = 0; i < dirTrack; i++)
+				{
+					tok = get_tokens(dir[i].DIRName);
+					if((strcmp(uppercase(tokens->items[1]), tok->items[0]) == 0)
+					   && (dir[i].DIRAttr == 0x20))
+					{
+						exist = 1;
+						filesize = dir[i].DIRSize;
+						fileCluster = dir[i].lowCluster;
+						break;
+					}
+					else if((strcmp(uppercase(tokens->items[1]), tok->items[0]) == 0)
+							&& (dir[i].DIRAttr == 0x10))
+					{
+						printf("ERROR: %s is a Directory\n", tokens->items[1]);
+						error = 1;
+						isDir = 1;
+						break;
+					}
+				}
+			}
+			else{
+				//check to see if file exist
+				for(int i = 0; i < redTrack; i++)
+				{
+					tok = get_tokens(redDir[i].DIRName);
+					if((strcmp(uppercase(tokens->items[1]), tok->items[0]) == 0)
+					   && (redDir[i].DIRAttr == 0x20))
+					{
+						exist = 1;
+						filesize = redDir[i].DIRSize;
+						fileCluster = redDir[i].lowCluster;
+						break;
+					}
+					else if((strcmp(uppercase(tokens->items[1]), tok->items[0]) == 0)
+							&& (redDir[i].DIRAttr == 0x10))
+					{
+						printf("ERROR: %s is a Directory\n", tokens->items[1]);
+						error = 1;
+						isDir = 1;
+						break;
+					}
+				}
+			}
 
             if(exist)
             {
@@ -910,7 +997,7 @@ int main(int argc, char **argv)
                 for(int i = 0; i < dirTrack;i++)
                 {
                     tok = get_tokens(dir[i].DIRName);
-                    if(strcmp(tok->items[0], uppercase(tokens->items[1])) == 0)
+                    if(strcmp(tok->items[0], uppercase(tokens->items[2])) == 0)
                     {
                         exist = 1;
                         //if to argument is a file
@@ -923,14 +1010,14 @@ int main(int argc, char **argv)
                         {
                             //call cpy func here
                             myCpyFunc(fd,source_file_cluster, uppercase(tokens->items[1]),
-                                    uppercase(tokens->items[1]), i, index);
+                                    uppercase(tokens->items[2]), i, index);
                             break;
                         }
                     }
                 }
                 if(exist != 1)
                     myCpyFunc(fd,source_file_cluster, uppercase(tokens->items[1]),
-                              uppercase(tokens->items[1]), -1, index);
+                              uppercase(tokens->items[2]), -1, index);
             }
             else
                 printf("ERROR: %s doesn't exist.\n", tokens->items[1]);
