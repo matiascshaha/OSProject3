@@ -5,7 +5,7 @@
 
 Division of Labor: 
 
-        Kyle Wise: info,size,ls,cd, mkdir,read, open, cp, rm, mv, rmdir 
+        Kyle Wise: info,size,ls,cd, mkdir,read, open, cp, rm, mv, rmdir(extra credit)
 
         Matias Perichon: Creat Function,size, read, lseek, cp, info
 
