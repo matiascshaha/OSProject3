@@ -171,7 +171,7 @@ int main(int argc, char **argv)
         tokenlist *tokens = get_tokens(input);
         //for the string argument in write
         //take the substring and strip quotes
-        if(tokens->size > 4)
+        if(tokens->size >= 4)
             sscanf(input, "%*[^\"]%*c%[^\"]", str);
 
         if(strcmp(tokens->items[0], "exit") == 0)
@@ -720,7 +720,7 @@ int main(int argc, char **argv)
             int isOpen = 1;
             if(tokens->size < 3)
             {
-                printf("ERROR: Unable to read (null).\n");
+                printf("ERROR: Unable to read %s for size %s.\n", tokens->items[1], tokens->items[2]);
             }
             else
             {
@@ -761,7 +761,7 @@ int main(int argc, char **argv)
 									{
 										//call read function here and read to end
 										myReadFunc(fd,(findCluster(dir[i].lowCluster) + op[x].offset_position),
-												   (atoi(tokens->items[2]) - dir[i].DIRSize), dir[i].lowCluster,
+												   (dir[i].DIRSize - op[x].offset_position), dir[i].lowCluster,
 												   dir[i].DIRSize, 1, uppercase(tokens->items[1]));
 
 									}
@@ -982,6 +982,8 @@ int main(int argc, char **argv)
             }
             else //prompt user for another command
                 continue;
+				
+			memset(str, 0, 100);
         }
 
         else if(strcmp(tokens->items[0], "rm") == 0)
@@ -1093,13 +1095,60 @@ int main(int argc, char **argv)
             }
             else
                 printf("ERROR: %s doesn't exist.\n", tokens->items[1]);
-        }    /*extra credit if we get to it
-            else if(strcmp(tokens->items[0], "rmdir") == 0)
-            {}
-            else if(strcmp(tokens->items[0], "cp") == 0 &&
-                            strcmp(tokens->items[1] == "-r") == 0)
-            {}
-            */
+        }
+		else if(strcmp(tokens->items[0], "rmdir") == 0){
+			if(tokens->size == 1)
+                printf("ERROR: Cannot remove (null).\n");
+            else
+            {
+                int d;
+                int temp = 0;
+                int offset = 0;
+				int size = 0;
+                //check if file already exists
+                tokenlist *tok;
+                for(int i = 0; i < dirTrack; i++)
+                {
+
+                    tok = get_tokens(dir[i].DIRName);
+                    if((strcmp(uppercase(tokens->items[1]), tok->items[0]) == 0)
+                       && (dir[i].DIRAttr == 0x10))
+                    {
+						findFatSequence(fd, dir[i].lowCluster);
+						getDir(fd, dir[i].lowCluster);
+						temp = 1;
+						if(dirTrack > 2){
+							printf("ERROR: %s is not empty.\n", tokens->items[1]);
+							findFatSequence(fd, currentCluster);
+							getDir(fd, currentCluster);
+							break;
+						}
+						findFatSequence(fd, currentCluster);
+						getDir(fd, currentCluster);
+						
+						bytesUsed -= dir[i].DIRSize;
+                        printf("%s removed. %d bytes freed\n", tokens->items[1], dir[i].DIRSize);
+                        remDir(fd, dir[i].lowCluster, i, currentCluster);
+						remEntry(fd, findCluster(currentCluster) + (32*i), currentCluster);
+                        
+                        break;
+                    }
+                    else if((strcmp(uppercase(tokens->items[1]), tok->items[0]) == 0)
+                            && (dir[i].DIRAttr != 0x10))
+                    {
+                        d = 1;
+                        break;
+                    }
+                }
+
+                //if it doesn't exist
+                if(d == 1)
+                    printf("ERROR: %s is not a directory.\n", tokens->items[1]);
+
+                else if(temp != 1)
+                    printf("ERROR: %s doesn't exist.\n", tokens->items[1]);
+            }
+		}
 
         else //not a recognized command
             printf("%s: command not found\n", tokens->items[0]);
@@ -1151,8 +1200,7 @@ void myReadFunc(int fd, int filePosOffset,int bytesToRead, int fileCluster,
                 printf("ERROR: cannot read\n");
             
             fileByteTracker += sizeOfReadBuff;
-            printf("%s\n", buf3);
-
+			printf("%s\n", buf3);
             //if already read end clust
             if(trackClust == endClust || fileByteTracker == filePosOffset + bytesToRead)
                 break;
@@ -1199,7 +1247,7 @@ void myReadFunc(int fd, int filePosOffset,int bytesToRead, int fileCluster,
         {
             printf("ERROR: cannot read\n");
         }
-        printf("%s\n", buffer);
+        printf("%s", buffer);
     }
     printf("\n");
 
@@ -1225,9 +1273,11 @@ void myReadFunc(int fd, int filePosOffset,int bytesToRead, int fileCluster,
 
     else
     {
+		tokenlist * tok;
         for(int i = 0; i < dirTrack; i++)
         {
-            if (strcmp(filename, dir[i].DIRName) == 0)
+			tok = get_tokens(dir[i].DIRName);
+            if (strcmp(filename, tok->items[0]) == 0)
             {
                 for (int x = 0; x < 100; x++)
                 {
@@ -1241,12 +1291,6 @@ void myReadFunc(int fd, int filePosOffset,int bytesToRead, int fileCluster,
             }
         }
     }
-}
-
-unsigned int usedSpace(int desc, int cluster)
-{
-
-
 }
 
 void findNumClust(int fd, int root)
