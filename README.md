@@ -15,13 +15,14 @@ Division of Labor:
         
 Tar File:
 
-        proj3.c (main File): contains all the logic and impementation of project functionality. Contains all 15 functions listed in project writeup. One big while loop in main with 15 if conditions nested inside that contain functionality.
+        proj3.c (main File): contains all the logic and impementation of project functionality. Contains all 15 functions listed in project writeup. 
+        One big while loop in main with 15 if conditions nested inside that contain functionality.
         
         README: contains all special need-to-know information about our project, such as division of labor, file content, bugs,etc.
         
         Makefile: compiles proj3.c and renames to executable project3.
             - first thing to do is run command make
-            - then Must be ran like so once compiled: project3 fat32.img
+            - then Must be ran like so once compiled: ./project3 fat32.img
 
 Bugs: 
 
