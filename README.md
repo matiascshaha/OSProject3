@@ -34,4 +34,5 @@ Bugs:
     
 Special Considerations: 
 
-       - Whenever you read or write the offset position of the file is changed, so if you want to read the beginning of a file after you have to make sure to lseek FILENAME 0 to go  back to the beginning position.
+       - Whenever you read or write the offset position of the file is changed, so if you want to read the beginning of a file after you have
+         to make sure to lseek FILENAME 0 to go  back to the beginning position.
