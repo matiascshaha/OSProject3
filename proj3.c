@@ -20,6 +20,7 @@ void add_token(tokenlist *tokens, char *item);
 void free_tokens(tokenlist *tokens);
 void getInfo(int desc);
 void printInfo();
+unsigned int usedSpace(int desc, int cluster);
 void fileSize(const char *file);
 void listDir(int desc, int cluster);
 void getDir(int desc, int cluster);
@@ -97,11 +98,13 @@ struct openTable
 
 //Global tacking variables
 unsigned char * buff[5];
-unsigned int totalSpace;
+unsigned int bytesUsed;
+unsigned int bytesAvailable;
 int globalClust;
 struct openTable op[100];
 struct DIRENTRY dir[16];
 struct DIRENTRY redDir[208];
+unsigned int fileBytes = 0;
 int openCheck;
 int redTrack;
 int dirTrack;
@@ -154,8 +157,9 @@ int main(int argc, char **argv)
 
     //set initial root cluster into array
     findNumClust(fd, bpb.rootCuster);
-	totalSpace = (bpb.FATsize*bpb.BytesPerSec) - (globalClust * 4);
-	findFatSequence(fd,bpb.rootCuster);
+	bytesUsed = (bpb.FATsize*bpb.BytesPerSec) - (globalClust * 4);
+    bytesAvailable = (bpb.totalSectors*bpb.BytesPerSec) - (globalClust*bpb.BytesPerSec);
+	findFatSequence(fd,bpb.rootCuster); 
     currentCluster = 2;
     getDir(fd, bpb.rootCuster);
 
@@ -182,9 +186,11 @@ int main(int argc, char **argv)
             if(redFlip != 1)
             {
                 tokenlist *tok;
-                for(int i = 0; i < dirTrack; i++){
+                for(int i = 0; i < dirTrack; i++)
+                {
                     tok = get_tokens(dir[i].DIRName);
-                    if((check = strcmp(uppercase(tokens->items[1]), tok->items[0])) == 0){
+                    if((check = strcmp(uppercase(tokens->items[1]), tok->items[0])) == 0)
+                    {
                         check = 0;
                         printf("%d bytes\n", dir[i].DIRSize);
                         break;
@@ -196,9 +202,11 @@ int main(int argc, char **argv)
             else
             {
                 tokenlist *tok;
-                for(int i = 0; i < redTrack; i++){
+                for(int i = 0; i < redTrack; i++)
+                {
                     tok = get_tokens(redDir[i].DIRName);
-                    if((check = strcmp(uppercase(tokens->items[1]), tok->items[0])) == 0){
+                    if((check = strcmp(uppercase(tokens->items[1]), tok->items[0])) == 0)
+                    {
                         check = 0;
                         printf("%d bytes\n", dir[i].DIRSize);
                         break;
@@ -218,9 +226,8 @@ int main(int argc, char **argv)
                 listDir(fd, currentCluster);
 
 			else if(strcmp(tokens->items[1], "..") == 0)
-            {
 				listDir(fd, cdClust[cdTrack]);
-			}
+			
 
             else
             {
@@ -365,9 +372,7 @@ int main(int argc, char **argv)
 
                 //if it doesn't exist, create it
                 if(temp != 1)
-                {
                     createFile(fd, currentCluster,tokens->items[1]);
-                }
             }
         }
 
@@ -998,10 +1003,11 @@ int main(int argc, char **argv)
                     if((strcmp(uppercase(tokens->items[1]), tok->items[0]) == 0)
                        && (dir[i].DIRAttr != 0x10))
                     {
-						size = dir[i].DIRSize;
+						bytesUsed -= dir[i].DIRSize;
+                        printf("%s removed. %d bytes freed\n", tokens->items[1], dir[i].DIRSize);
                         remDir(fd, dir[i].lowCluster, i, currentCluster);
                         temp = 1;
-                        printf("%s removed. %d bytes freed\n", tokens->items[1], size);
+                        
                         break;
                     }
                     else if((strcmp(uppercase(tokens->items[1]), tok->items[0]) == 0)
@@ -1057,8 +1063,8 @@ int main(int argc, char **argv)
                 }
                 error = 1;
             }
-            if(error == 0){
-
+            if(error == 0)
+            {
                 int exist = 0;
                 for(int i = 0; i < dirTrack;i++)
                 {
@@ -1237,6 +1243,12 @@ void myReadFunc(int fd, int filePosOffset,int bytesToRead, int fileCluster,
     }
 }
 
+unsigned int usedSpace(int desc, int cluster)
+{
+
+
+}
+
 void findNumClust(int fd, int root)
 {
 	int offset_track = 0;
@@ -1406,7 +1418,7 @@ void remDir(int desc, unsigned int cluster, int off, int current){
             exit(0);
         }
 
-		totalSpace += 512;
+		bytesAvailable += 512;
     }
     currentCluster = current;
     //location of direntry in current cluster
@@ -1517,9 +1529,7 @@ void createFile(int fd,int cluster,char *filename)
                 memset(buff,0,4);   //flush buffer
                 numCluster++;
             }
-			if(totalSpace == 0)
-				totalSpace = (bpb.FATsize*bpb.BytesPerSec) - ((numCluster+1) * 4);
-
+			
             //add new entry to fat array = cluster number of new entry in fat
             fat[fatTrack] = emptyCluster;
             fatTrack++;
@@ -1564,7 +1574,7 @@ void createFile(int fd,int cluster,char *filename)
             
             //print out prompt
             printf("%s created: %d bytes used, %d bytes remaining\n", filename,
-                    dir_to_be_added.DIRSize, (totalSpace -= dir_to_be_added.DIRSize));
+                    bytesUsed, bytesAvailable);
             break;
         }
     }
@@ -1651,9 +1661,6 @@ void makeDir(int fd,int cluster,char *filename)
                 numCluster++;
             }
 
-			if(totalSpace == 0)
-				totalSpace = (bpb.FATsize*bpb.BytesPerSec) - ((numCluster+1) * 4);
-
             //add new entry to fat array = cluster number of new entry in fat
             fat[fatTrack] = emptyCluster;
             fatTrack++;
@@ -1732,11 +1739,9 @@ void makeDir(int fd,int cluster,char *filename)
             if ((lseek(fd, findCluster(cluster), SEEK_SET)) == -1) 
                 printf("Cannot seek fat32.img\n");
             
-
             //print out prompt
-            printf("%s created: %d bytes used, %d bytes remaining\n", filename, 4, totalSpace-= 4);
+            printf("%s created: %d bytes used, %d bytes remaining\n", filename, bytesUsed, bytesAvailable);
             break;
-
         }
     }
 }
@@ -2019,8 +2024,8 @@ void listDir(int desc, int cluster)
     }
 }
 
-void getDir(int desc, int cluster){
-
+void getDir(int desc, int cluster)
+{
     for(int i = 0; i < fatTrack; i++)
     {
         //hop to next entry in fat
@@ -2034,6 +2039,7 @@ void getDir(int desc, int cluster){
             if ((dir[x].DIRName[0] != (char)0xe5) &&
                 (dir[x].DIRAttr == 0x1 || dir[x].DIRAttr == 0x10 || dir[x].DIRAttr == 0x20))
             {
+                fileBytes += dir[x].DIRSize;
                 dirTrack = x + 1;
             }
         }
@@ -2056,6 +2062,7 @@ void getBig(int desc, int cluster){
             if ((redDir[x].DIRName[0] != (char)0xe5) &&
                 (redDir[x].DIRAttr == 0x1 || redDir[x].DIRAttr == 0x10 || redDir[x].DIRAttr == 0x20))
             {
+                fileBytes += dir[x].DIRSize;
                 redTrack = x + 1;
             }
             value++;
@@ -2174,12 +2181,15 @@ void myWriteFunc(int fd, int offset, int bytesToWrite, int fileCluster,
                 //printf("New file size:%d\n", dir[i].DIRSize);
             }
         }
-		prevSize = dir[temp].DIRSize;
+		prevSize = dir[temp].DIRSize - bytesToWrite;
 		lseek(fd, (findCluster(currentCluster) + (32*temp)), SEEK_SET);
 		uint32_t size = dir[temp].DIRSize;
 		write(fd, &dir[temp], 32);
-		totalSpace -= bytesToWrite;
-		printf("Used Space: %d bytes. Total Space Available: %d bytes\n", dir[temp].DIRSize, totalSpace);
+        if(bytesToWrite > prevSize)
+		  bytesUsed += (bytesToWrite - prevSize);
+
+        bytesAvailable -= extraClusters*bpb.BytesPerSec;
+		printf("Used Space: %d bytes. Total Space Available: %d bytes\n", bytesUsed, bytesAvailable);
     }
 
     else //no clusters need to be allocated
@@ -2203,8 +2213,8 @@ void myWriteFunc(int fd, int offset, int bytesToWrite, int fileCluster,
 		lseek(fd, (findCluster(currentCluster) + (32*temp)), SEEK_SET);
 		uint32_t size = dir[temp].DIRSize;
 		write(fd, &dir[temp], 32);
-		totalSpace -= bytesToWrite;
-		printf("Used Space: %d bytes. Total Space Available: %d bytes\n", dir[temp].DIRSize, totalSpace);
+		bytesUsed += bytesToWrite;
+		printf("Used Space: %d bytes. Total Space Available: %d bytes\n", bytesUsed, bytesAvailable);
     }
 
     //Update file offset
