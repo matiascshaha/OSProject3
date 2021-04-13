@@ -5,11 +5,11 @@
 
 Division of Labor: 
 
-        Kyle Wise: info,size,ls,cd, mkdir,read, open, cp, rm, mv 
+        Kyle Wise: info,size,ls,cd, mkdir,read, open, cp, rm, mv, rmdir 
 
         Matias Perichon: Creat Function,size, read, lseek, cp, info
 
-        Andres Gonzalez:size, ls, cd, write, close, cp, rm, mv
+        Andres Gonzalez:size, ls, cd, write, close, cp, rm, mv, overall case insensitivity
         
         ***** we worked on a lot of the code together as a group through discord screen share *****
         
@@ -25,8 +25,13 @@ Tar File:
 
 Bugs: 
 
-        N/A
+        read:
+         - When trying to read to a file in GREEN, errors for not existing or errors in writing occur.
+        
+        write:
+         - When trying to write to a file in GREEN, errors for not existing or errors in writing occur.
+         - Trying to overwrite currently used bytes, the code sometimes writes just the first word in the string.
     
 Special Considerations: 
 
-        whenever you read or write the offset position of the file is changed, so if you want to read the beginning of a file after you have to make sure to lseek FILENAME 0 to go back to the beginning position.
+       - Whenever you read or write the offset position of the file is changed, so if you want to read the beginning of a file after you have to make sure to lseek FILENAME 0 to go  back to the beginning position.
